@@ -1,0 +1,24 @@
+# --- 1. Thư viện (Chặn folder nặng, GIỮ LẠI file lock) ---
+node_modules/
+/vendor/
+# QUAN TRỌNG: Không được thêm package-lock.json và composer.lock vào đây!
+
+# --- 2. Môi trường & Bảo mật (Chặn lộ pass) ---
+.env
+.env.local
+.env.*.local
+npm-debug.log*
+yarn-debug.log*
+
+# --- 3. Build Output (Do Vite/Web tạo ra) ---
+dist/
+build/
+coverage/
+/public/dist/
+
+# --- 4. Hệ điều hành & Editor (File rác) ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.sublime-project

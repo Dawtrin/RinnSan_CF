@@ -1,0 +1,14 @@
+{
+    "name": "rinnsan/rinn-san-web",
+    "description": "Du an web sieu dinh cao",
+    "type": "project",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Rinnsan\\RinnSanWeb\\": "src/"
+        }
+    },
+    "require": {
+        "vlucas/phpdotenv": "^5.6"
+    }
+}

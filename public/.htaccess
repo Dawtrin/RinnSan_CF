@@ -1,0 +1,10 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Bỏ qua nếu nó là file hoặc thư mục có thật (như css, js, images)
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+
+    # Nếu không, chuyển tất cả yêu cầu đến index.php
+    RewriteRule ^ index.php [L]
+</IfModule>
