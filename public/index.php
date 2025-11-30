@@ -1,31 +1,56 @@
 <?php
-// Bật hiển thị lỗi để debug
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+// Use manual bootstrap
+require_once __DIR__ . '/../bootstrap.php';
 
-// 1. Tải file autoload của Composer
-require __DIR__ . '/../vendor/autoload.php';
-
-// 2. Tải file .env
-try {
-    $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../');
-    $dotenv->load();
-} catch (Exception $e) {
-    die('Lỗi: Không thể tải file .env. ' . $e->getMessage());
+// Simple test without classes first
+if (!class_exists('Rinnsan\RinnSanWeb\Core\Application')) {
+    die("❌ Application class not found. Check bootstrap.php");
 }
 
-// 3. KHỞI TẠO ROUTER
-// (Namespace phải đúng với file src/Core/Router.php)
-$router = new \Rinnsan\RinnSanWeb\Core\Router();
+try {
+    $app = Rinnsan\RinnSanWeb\Core\Application::getInstance();
+    $router = $app->getRouter();
 
-// 4. TẢI FILE "BẢN ĐỒ" ROUTES
-// (File này sẽ dùng biến $router ở trên)
-require __DIR__ . '/../routes/web.php';
+    // Test route
+    $router->get('/', function() {
+        echo "<h1>🎉 RINNSAN_WEB BACKEND ĐANG CHẠY!</h1>";
+        echo "<p>✅ PHP Version: " . PHP_VERSION . "</p>";
+        echo "<p>✅ Server Time: " . date('Y-m-d H:i:s') . "</p>";
+        
+        try {
+            $db = Rinnsan\RinnSanWeb\Core\Database::getInstance();
+            echo "<p>✅ Database: Connected</p>";
+            
+            // Test SQL Server query
+            $tables = Rinnsan\RinnSanWeb\Core\Database::fetchAll("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES");
+            echo "<p>✅ SQL Server: " . count($tables) . " tables found</p>";
+        } catch (Exception $e) {
+            echo "<p>❌ Database: " . $e->getMessage() . "</p>";
+        }
+    });
 
+    // Health check
+    $router->get('/health', function() {
+        header('Content-Type: application/json');
+        echo json_encode([
+            'status' => 'healthy',
+            'timestamp' => date('Y-m-d H:i:s'),
+            'service' => 'RINNSAN_WEB Backend'
+        ]);
+    });
 
-// 5. CHẠY BỘ ĐỊNH TUYẾN
-// Router sẽ tự phân tích URL và gọi đúng Controller
-$router->dispatch();
+    $app->run();
 
-?>
+} catch (Exception $e) {
+    echo "<h1>❌ Server Error</h1>";
+    echo "<p><strong>Message:</strong> " . $e->getMessage() . "</p>";
+    echo "<p><strong>File:</strong> " . $e->getFile() . "</p>";
+    echo "<p><strong>Line:</strong> " . $e->getLine() . "</p>";
+    
+    if ($_ENV['APP_DEBUG'] ?? false) {
+        echo "<pre>";
+        echo "Stack Trace:\n";
+        echo $e->getTraceAsString();
+        echo "</pre>";
+    }
+}

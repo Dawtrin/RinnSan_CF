@@ -53,4 +53,133 @@ class Model
         $sql = "DELETE FROM {$instance->table} WHERE id = ?";
         return Database::query($sql, [$id]);
     }
+
+    /**
+     * Pagination
+     */
+    public static function paginate($page = 1, $perPage = 20, $conditions = [], $orderBy = 'id DESC')
+    {
+        $instance = new static;
+        $offset = ($page - 1) * $perPage;
+        
+        $where = '';
+        $params = [];
+        
+        if (!empty($conditions)) {
+            $wheres = [];
+            foreach ($conditions as $key => $value) {
+                if (is_array($value)) {
+                    $wheres[] = "{$key} {$value[0]} ?";
+                    $params[] = $value[1];
+                } else {
+                    $wheres[] = "{$key} = ?";
+                    $params[] = $value;
+                }
+            }
+            $where = 'WHERE ' . implode(' AND ', $wheres);
+        }
+        
+        // Get total count
+        $countSql = "SELECT COUNT(*) as total FROM {$instance->table} {$where}";
+        $totalResult = Database::fetch($countSql, $params);
+        $total = $totalResult['total'] ?? 0;
+        
+        // Get data
+        $sql = "SELECT * FROM {$instance->table} {$where} ORDER BY {$orderBy} 
+                OFFSET {$offset} ROWS FETCH NEXT {$perPage} ROWS ONLY";
+        $data = Database::fetchAll($sql, $params);
+        
+        return [
+            'data' => $data,
+            'pagination' => [
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'total_pages' => ceil($total / $perPage),
+                'from' => $offset + 1,
+                'to' => min($offset + $perPage, $total)
+            ]
+        ];
+    }
+
+    /**
+     * Count records
+     */
+    public static function count($conditions = [])
+    {
+        $instance = new static;
+        $where = '';
+        $params = [];
+        
+        if (!empty($conditions)) {
+            $wheres = [];
+            foreach ($conditions as $key => $value) {
+                if (is_array($value)) {
+                    $wheres[] = "{$key} {$value[0]} ?";
+                    $params[] = $value[1];
+                } else {
+                    $wheres[] = "{$key} = ?";
+                    $params[] = $value;
+                }
+            }
+            $where = 'WHERE ' . implode(' AND ', $wheres);
+        }
+        
+        $sql = "SELECT COUNT(*) as total FROM {$instance->table} {$where}";
+        $result = Database::fetch($sql, $params);
+        return $result['total'] ?? 0;
+    }
+
+    /**
+     * Find by multiple conditions
+     */
+    public static function findBy($conditions)
+    {
+        $instance = new static;
+        $wheres = [];
+        $params = [];
+        
+        foreach ($conditions as $key => $value) {
+            if (is_array($value)) {
+                $wheres[] = "{$key} {$value[0]} ?";
+                $params[] = $value[1];
+            } else {
+                $wheres[] = "{$key} = ?";
+                $params[] = $value;
+            }
+        }
+        
+        $where = implode(' AND ', $wheres);
+        $sql = "SELECT * FROM {$instance->table} WHERE {$where}";
+        return Database::fetch($sql, $params);
+    }
+
+    /**
+     * Find all by multiple conditions
+     */
+    public static function findAllBy($conditions, $orderBy = 'id DESC', $limit = null)
+    {
+        $instance = new static;
+        $wheres = [];
+        $params = [];
+        
+        foreach ($conditions as $key => $value) {
+            if (is_array($value)) {
+                $wheres[] = "{$key} {$value[0]} ?";
+                $params[] = $value[1];
+            } else {
+                $wheres[] = "{$key} = ?";
+                $params[] = $value;
+            }
+        }
+        
+        $where = implode(' AND ', $wheres);
+        $sql = "SELECT * FROM {$instance->table} WHERE {$where} ORDER BY {$orderBy}";
+        
+        if ($limit) {
+            $sql .= " OFFSET 0 ROWS FETCH NEXT {$limit} ROWS ONLY";
+        }
+        
+        return Database::fetchAll($sql, $params);
+    }
 }

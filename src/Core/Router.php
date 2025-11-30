@@ -4,89 +4,199 @@ namespace Rinnsan\RinnSanWeb\Core;
 
 class Router
 {
-    protected $routes = [];
+    private $routes = [];
 
-    protected function add($method, $uri, $callback)
+    public function get(string $path, $handler): void
     {
-        $paramNames = [];
-        preg_match_all('/{([a-zA-Z0-9_]+)}/', $uri, $matches);
-        $paramNames = $matches[1]; 
+        $this->addRoute('GET', $path, $handler);
+    }
 
-        $regexUri = preg_replace('/{([a-zA-Z0-9_]+)}/', '([^\/]+)', $uri);
-        $regexPattern = '#^' . $regexUri . '$#'; 
+    public function post(string $path, $handler): void
+    {
+        $this->addRoute('POST', $path, $handler);
+    }
 
+    public function put(string $path, $handler): void
+    {
+        $this->addRoute('PUT', $path, $handler);
+    }
+
+    public function delete(string $path, $handler): void
+    {
+        $this->addRoute('DELETE', $path, $handler);
+    }
+
+    private function addRoute(string $method, string $path, $handler, array $middleware = []): void
+    {
         $this->routes[] = [
             'method' => $method,
-            'uri' => $uri,
-            'pattern' => $regexPattern,
-            'callback' => $callback,
-            'param_names' => $paramNames
+            'path' => $path,
+            'handler' => $handler,
+            'pattern' => $this->convertToPattern($path),
+            'middleware' => $middleware
         ];
     }
 
-    public function get($uri, $callback)     { $this->add('GET', $uri, $callback); }
-    public function post($uri, $callback)    { $this->add('POST', $uri, $callback); }
-    public function put($uri, $callback)     { $this->add('PUT', $uri, $callback); }
-    public function patch($uri, $callback)   { $this->add('PATCH', $uri, $callback); }
-    public function delete($uri, $callback)  { $this->add('DELETE', $uri, $callback); }
-
-    public function dispatch()
+    /**
+     * Thêm route với middleware
+     */
+    public function getWithMiddleware(string $path, $handler, array $middleware = []): void
     {
-        $requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-        $requestMethod = $_SERVER['REQUEST_METHOD'];
+        $this->addRoute('GET', $path, $handler, $middleware);
+    }
 
-        if ($requestUri === '') $requestUri = '/';
+    public function postWithMiddleware(string $path, $handler, array $middleware = []): void
+    {
+        $this->addRoute('POST', $path, $handler, $middleware);
+    }
 
-        $matchedRoute = null;
-        $params = [];
-        $allowedMethods = [];
+    public function putWithMiddleware(string $path, $handler, array $middleware = []): void
+    {
+        $this->addRoute('PUT', $path, $handler, $middleware);
+    }
+
+    public function deleteWithMiddleware(string $path, $handler, array $middleware = []): void
+    {
+        $this->addRoute('DELETE', $path, $handler, $middleware);
+    }
+
+    private function convertToPattern(string $path): string
+    {
+        $pattern = preg_replace('/\{([a-zA-Z_][a-zA-Z0-9_]*)\}/', '([^/]+)', $path);
+        return '#^' . $pattern . '$#';
+    }
+
+    public function dispatch(): void
+    {
+        $method = $_SERVER['REQUEST_METHOD'];
+        $path = $this->getCurrentPath();
 
         foreach ($this->routes as $route) {
-            if (preg_match($route['pattern'], $requestUri, $matches)) {
-                $allowedMethods[] = $route['method'];
+            if ($route['method'] === $method && preg_match($route['pattern'], $path, $matches)) {
+                array_shift($matches);
                 
-                if ($requestMethod === $route['method']) {
-                    $matchedRoute = $route;
-                    array_shift($matches); 
-                    
-                    if (!empty($route['param_names'])) {
-                        $params = array_combine($route['param_names'], $matches);
+                // Execute middleware
+                $request = ['path' => $path, 'method' => $method];
+                if (!empty($route['middleware'])) {
+                    foreach ($route['middleware'] as $middlewareClass) {
+                        $middleware = new $middlewareClass();
+                        if (!$middleware->handle($request)) {
+                            return; // Middleware đã xử lý response
+                        }
                     }
-                    break; 
                 }
+                
+                $this->executeHandler($route['handler'], $matches);
+                return;
             }
         }
 
-        if ($matchedRoute) {
-            $callback = $matchedRoute['callback'];
-            $this->callAction($callback[0], $callback[1], $params);
-        } elseif (!empty($allowedMethods)) {
-            http_response_code(405);
-            echo "<h1>405 Method Not Allowed</h1>";
-            echo "Phương thức {$requestMethod} không được hỗ trợ. Các phương thức được phép: " . implode(', ', $allowedMethods);
-        } else {
-            http_response_code(404);
-            echo "<h1>404 Not Found</h1>";
-            echo "Không tìm thấy trang cho: " . htmlspecialchars($requestUri);
-        }
+        $this->handle404();
     }
 
-    protected function callAction($controllerClass, $action, $params = [])
+    private function getCurrentPath(): string
     {
-        if (!class_exists($controllerClass)) {
-            http_response_code(500);
-            echo "<h1>500 Server Error</h1>Lỗi: Lớp Controller '{$controllerClass}' không tồn tại.";
-            return;
-        }
-
-        $controller = new $controllerClass();
-
-        if (!method_exists($controller, $action)) {
-            http_response_code(500);
-            echo "<h1>500 Server Error</h1>Lỗi: Phương thức '{$action}' không tồn tại trong Controller '{$controllerClass}'.";
-            return;
+        $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+        $basePath = dirname($_SERVER['SCRIPT_NAME']);
+        
+        if ($basePath !== '/' && $basePath !== '\\') {
+            $path = str_replace($basePath, '', $path);
         }
         
-        $controller->$action($params);
+        return rtrim($path, '/') ?: '/';
+    }
+
+    private function executeHandler($handler, array $params = []): void
+    {
+        // Callable (closure or [object, method])
+        if (is_callable($handler)) {
+            call_user_func_array($handler, $params);
+            return;
+        }
+
+        // Handler as array: [ControllerClass::class, 'method']
+        if (is_array($handler) && count($handler) === 2) {
+            $controller = $handler[0];
+            $method = $handler[1];
+
+            // If controller is provided as class name string, instantiate and call
+            if (is_string($controller) && is_string($method)) {
+                if (!class_exists($controller)) {
+                    // Try to resolve short names (Api\ or Web\)
+                    if (strpos($controller, 'Api\\') === 0) {
+                        $controller = 'Rinnsan\\RinnSanWeb\\Controllers\\Api\\' . substr($controller, 4);
+                    } elseif (strpos($controller, 'Web\\') === 0) {
+                        $controller = 'Rinnsan\\RinnSanWeb\\Controllers\\Web\\' . substr($controller, 4);
+                    }
+                }
+
+                if (!class_exists($controller)) {
+                    throw new \Exception("Controller {$controller} not found");
+                }
+
+                $instance = new $controller();
+
+                if (!method_exists($instance, $method)) {
+                    throw new \Exception("Method {$method} not found in controller {$controller}");
+                }
+
+                call_user_func_array([$instance, $method], $params);
+                return;
+            }
+        }
+
+        // Handler as string 'Controller@method'
+        if (is_string($handler)) {
+            $this->callControllerMethod($handler, $params);
+            return;
+        }
+
+        throw new \Exception("Invalid route handler");
+    }
+
+    private function callControllerMethod(string $handler, array $params): void
+    {
+        list($controller, $method) = explode('@', $handler);
+        
+        // Determine namespace based on controller path
+        if (strpos($controller, 'Api\\') === 0) {
+            $controller = 'Rinnsan\\RinnSanWeb\\Controllers\\Api\\' . substr($controller, 4);
+        } elseif (strpos($controller, 'Web\\') === 0) {
+            $controller = 'Rinnsan\\RinnSanWeb\\Controllers\\Web\\' . substr($controller, 4);
+        } else {
+            $controller = 'Rinnsan\\RinnSanWeb\\Controllers\\' . $controller;
+        }
+
+        if (!class_exists($controller)) {
+            throw new \Exception("Controller {$controller} not found");
+        }
+
+        $controllerInstance = new $controller();
+
+        if (!method_exists($controllerInstance, $method)) {
+            throw new \Exception("Method {$method} not found in controller {$controller}");
+        }
+
+        call_user_func_array([$controllerInstance, $method], $params);
+    }
+
+    /**
+     * Handle 404 Not Found
+     */
+    private function handle404(): void
+    {
+        http_response_code(404);
+        
+        // Check if it's an API request
+        if (strpos($_SERVER['REQUEST_URI'], '/api/') !== false) {
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => false,
+                'message' => 'Endpoint không tồn tại',
+                'data' => []
+            ]);
+        } else {
+            echo "404 - Page not found";
+        }
     }
 }

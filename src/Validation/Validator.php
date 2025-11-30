@@ -51,6 +51,30 @@ class Validator
                     $this->errors[$field][] = "{$field} không được quá {$rule_value} ký tự";
                 }
                 break;
+            case 'numeric':
+                if (!is_numeric($value)) {
+                    $this->errors[$field][] = "{$field} phải là số";
+                }
+                break;
+            case 'integer':
+                if (!is_numeric($value) || (int)$value != $value) {
+                    $this->errors[$field][] = "{$field} phải là số nguyên";
+                }
+                break;
+            case 'decimal':
+                if (!is_numeric($value)) {
+                    $this->errors[$field][] = "{$field} phải là số thập phân";
+                }
+                break;
+            case 'in':
+                $allowed = explode(',', $rule_value);
+                if (!in_array($value, $allowed)) {
+                    $this->errors[$field][] = "{$field} phải là một trong: " . implode(', ', $allowed);
+                }
+                break;
+            case 'unique':
+                // Có thể implement sau nếu cần
+                break;
         }
     }
 
