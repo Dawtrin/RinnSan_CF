@@ -6,6 +6,7 @@ use Rinnsan\RinnSanWeb\Controllers\Api\ApiController;
 use Rinnsan\RinnSanWeb\Models\Role;
 use Rinnsan\RinnSanWeb\Helpers\RequestHelper;
 use Rinnsan\RinnSanWeb\Core\Database;
+use Rinnsan\RinnSanWeb\Services\AdminRoleService;
 
 class AdminRoleController extends ApiController
 {
@@ -16,13 +17,8 @@ class AdminRoleController extends ApiController
     public function index()
     {
         try {
-            $roles = Role::all();
-            
-            // Parse permissions
-            foreach ($roles as &$role) {
-                $role = Role::parsePermissions($role);
-            }
-            
+            $service = new AdminRoleService();
+            $roles = $service->list();
             return $this->success($roles, 'Lấy danh sách roles thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
@@ -41,16 +37,8 @@ class AdminRoleController extends ApiController
             if (!isset($data['name'])) {
                 return $this->error('Thiếu trường name', 400);
             }
-            
-            // Convert permissions array to JSON
-            if (isset($data['permissions']) && is_array($data['permissions'])) {
-                $data['permissions'] = json_encode($data['permissions']);
-            }
-            
-            Role::create($data);
-            $role = Role::find(Database::lastInsertId());
-            $role = Role::parsePermissions($role);
-            
+            $service = new AdminRoleService();
+            $role = $service->create($data);
             return $this->success($role, 'Tạo role thành công', 201);
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
@@ -64,22 +52,12 @@ class AdminRoleController extends ApiController
     public function update($id)
     {
         try {
-            $role = Role::find($id);
+            $data = RequestHelper::inputSanitized();
+            $service = new AdminRoleService();
+            $role = $service->update($id, $data);
             if (!$role) {
                 return $this->error('Role không tồn tại', 404);
             }
-            
-            $data = RequestHelper::inputSanitized();
-            
-            // Convert permissions array to JSON
-            if (isset($data['permissions']) && is_array($data['permissions'])) {
-                $data['permissions'] = json_encode($data['permissions']);
-            }
-            
-            Role::update($id, $data);
-            $role = Role::find($id);
-            $role = Role::parsePermissions($role);
-            
             return $this->success($role, 'Cập nhật role thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
@@ -93,19 +71,14 @@ class AdminRoleController extends ApiController
     public function destroy($id)
     {
         try {
-            $role = Role::find($id);
-            if (!$role) {
+            $service = new AdminRoleService();
+            $result = $service->delete($id);
+            if ($result === null) {
                 return $this->error('Role không tồn tại', 404);
             }
-            
-            // Không cho xóa role đang được sử dụng
-            $users = \Rinnsan\RinnSanWeb\Models\User::where('role_id', '=', $id);
-            if (!empty($users)) {
+            if ($result === false) {
                 return $this->error('Không thể xóa role đang được sử dụng', 400);
             }
-            
-            Role::delete($id);
-            
             return $this->success([], 'Xóa role thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);

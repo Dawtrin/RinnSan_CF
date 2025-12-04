@@ -13,7 +13,7 @@ $coreFiles = [
 foreach ($coreFiles as $file) {
     $fullPath = __DIR__ . $file;
     if (file_exists($fullPath)) {
-        require_once $fullPath;
+require_once $fullPath;
     } else {
         die("❌ Missing file: $file");
     }
@@ -38,3 +38,28 @@ if (file_exists($envFile)) {
 }
 
 echo "<!-- Bootstrap loaded successfully -->";
+// Load helpers required by Application
+$helperFiles = [
+    '/src/Helpers/ResponseHelper.php'
+];
+
+foreach ($helperFiles as $file) {
+    $fullPath = __DIR__ . $file;
+    if (file_exists($fullPath)) {
+        require_once $fullPath;
+    }
+}
+
+spl_autoload_register(function ($class) {
+    $prefix = 'Rinnsan\\RinnSanWeb\\';
+    $baseDir = __DIR__ . '/src/';
+    $len = strlen($prefix);
+    if (strncmp($prefix, $class, $len) !== 0) {
+        return;
+    }
+    $relativeClass = substr($class, $len);
+    $file = $baseDir . str_replace('\\', '/', $relativeClass) . '.php';
+    if (file_exists($file)) {
+        require_once $file;
+    }
+});

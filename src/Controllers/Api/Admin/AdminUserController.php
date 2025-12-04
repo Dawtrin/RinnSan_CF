@@ -8,6 +8,7 @@ use Rinnsan\RinnSanWeb\Models\UserAddress;
 use Rinnsan\RinnSanWeb\Models\ActivityLog;
 use Rinnsan\RinnSanWeb\Helpers\RequestHelper;
 use Rinnsan\RinnSanWeb\Core\Database;
+use Rinnsan\RinnSanWeb\Services\AdminUserService;
 
 class AdminUserController extends ApiController
 {
@@ -27,32 +28,11 @@ class AdminUserController extends ApiController
                 }
             }
             
-            // Kiểm tra email đã tồn tại
-            $existing = User::findByEmail($data['email']);
-            if ($existing) {
+            $service = new AdminUserService();
+            $user = $service->create($data);
+            if (!$user) {
                 return $this->error('Email đã được sử dụng', 400);
             }
-            
-            // Tạo user
-            $userData = [
-                'username' => $data['username'],
-                'email' => $data['email'],
-                'password' => $data['password'],
-                'full_name' => $data['full_name'],
-                'phone' => $data['phone'] ?? null,
-                'role_id' => $data['role_id'] ?? 3, // Default customer
-                'is_active' => $data['is_active'] ?? 1
-            ];
-            
-            User::create($userData);
-            $userId = Database::lastInsertId();
-            
-            // Log
-            ActivityLog::log('admin.user.create', "Admin tạo user: {$data['email']}", $userId);
-            
-            $user = User::find($userId);
-            unset($user['password']);
-            
             return $this->success($user, 'Tạo user thành công', 201);
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
@@ -66,24 +46,17 @@ class AdminUserController extends ApiController
     public function destroy($id)
     {
         try {
-            $user = User::find($id);
-            if (!$user) {
-                return $this->error('User không tồn tại', 404);
-            }
-            
-            // Không cho xóa chính mình
             if (session_status() === PHP_SESSION_NONE) {
                 session_start();
             }
-            if ($_SESSION['user_id'] == $id) {
+            $service = new AdminUserService();
+            $result = $service->delete($id, $_SESSION['user_id'] ?? 0);
+            if ($result === null) {
+                return $this->error('User không tồn tại', 404);
+            }
+            if ($result === false) {
                 return $this->error('Không thể xóa chính mình', 400);
             }
-            
-            // Log
-            ActivityLog::log('admin.user.delete', "Admin xóa user: {$user['email']}", $id);
-            
-            User::delete($id);
-            
             return $this->success([], 'Xóa user thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
@@ -97,23 +70,13 @@ class AdminUserController extends ApiController
     public function activate($id)
     {
         try {
-            $user = User::find($id);
+            $data = RequestHelper::input();
+            $isActive = isset($data['is_active']) ? (int)$data['is_active'] : 1;
+            $service = new AdminUserService();
+            $user = $service->activate($id, $isActive);
             if (!$user) {
                 return $this->error('User không tồn tại', 404);
             }
-            
-            $data = RequestHelper::input();
-            $isActive = isset($data['is_active']) ? (int)$data['is_active'] : 1;
-            
-            User::update($id, ['is_active' => $isActive]);
-            
-            // Log
-            $action = $isActive ? 'activate' : 'deactivate';
-            ActivityLog::log("admin.user.$action", "Admin {$action} user: {$user['email']}", $id);
-            
-            $user = User::find($id);
-            unset($user['password']);
-            
             return $this->success($user, $isActive ? 'Kích hoạt user thành công' : 'Khóa user thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
@@ -127,24 +90,15 @@ class AdminUserController extends ApiController
     public function changeRole($id)
     {
         try {
-            $user = User::find($id);
-            if (!$user) {
-                return $this->error('User không tồn tại', 404);
-            }
-            
             $data = RequestHelper::input();
             if (!isset($data['role_id'])) {
                 return $this->error('Thiếu role_id', 400);
             }
-            
-            User::update($id, ['role_id' => (int)$data['role_id']]);
-            
-            // Log
-            ActivityLog::log('admin.user.change_role', "Admin thay đổi role user: {$user['email']}", $id);
-            
-            $user = User::find($id);
-            unset($user['password']);
-            
+            $service = new AdminUserService();
+            $user = $service->changeRole($id, (int)$data['role_id']);
+            if (!$user) {
+                return $this->error('User không tồn tại', 404);
+            }
             return $this->success($user, 'Thay đổi role thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);

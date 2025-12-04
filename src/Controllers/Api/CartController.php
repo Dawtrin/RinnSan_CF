@@ -3,6 +3,7 @@
 namespace Rinnsan\RinnSanWeb\Controllers\Api;
 
 use Rinnsan\RinnSanWeb\Models\Product;
+use Rinnsan\RinnSanWeb\Services\CartService;
 
 class CartController extends ApiController
 {
@@ -13,37 +14,8 @@ class CartController extends ApiController
     public function index()
     {
         try {
-            if (session_status() === PHP_SESSION_NONE) {
-                session_start();
-            }
-            
-            $cart = $_SESSION['cart'] ?? [];
-            $items = [];
-            $total = 0;
-            
-            foreach ($cart as $item) {
-                $product = Product::find($item['product_id']);
-                if ($product && $product['is_active']) {
-                    $itemData = [
-                        'product_id' => $product['id'],
-                        'product_name' => $product['name'],
-                        'product_image' => $product['images'] ? json_decode($product['images'], true)[0] ?? null : null,
-                        'price' => $product['price'],
-                        'quantity' => $item['quantity'],
-                        'variant_combination' => $item['variant_combination'] ?? null,
-                        'note' => $item['note'] ?? null,
-                        'subtotal' => $product['price'] * $item['quantity']
-                    ];
-                    $items[] = $itemData;
-                    $total += $itemData['subtotal'];
-                }
-            }
-            
-            return $this->success([
-                'items' => $items,
-                'total' => $total,
-                'item_count' => count($items)
-            ], 'Lấy giỏ hàng thành công');
+            $service = new CartService();
+            return $this->success($service->getCart(), 'Lấy giỏ hàng thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
         }
@@ -56,46 +28,21 @@ class CartController extends ApiController
     public function add()
     {
         try {
-            if (session_status() === PHP_SESSION_NONE) {
-                session_start();
-            }
-            
             $data = json_decode(file_get_contents('php://input'), true);
             
             if (!isset($data['product_id']) || !isset($data['quantity'])) {
                 return $this->error('Thiếu product_id hoặc quantity', 400);
             }
             
-            $product = Product::find($data['product_id']);
-            if (!$product || !$product['is_active']) {
-                return $this->error('Sản phẩm không tồn tại hoặc đã ngừng bán', 404);
+            $service = new CartService();
+            $result = $service->addItem($data['product_id'], (int)$data['quantity'], [
+                'variant_combination' => $data['variant_combination'] ?? null,
+                'note' => $data['note'] ?? null,
+            ]);
+            if ($result === false) {
+                return $this->error('Sản phẩm không tồn tại', 404);
             }
-            
-            // Kiểm tra tồn kho
-            if ($product['track_quantity'] && $product['quantity'] < $data['quantity']) {
-                return $this->error('Không đủ số lượng trong kho', 400);
-            }
-            
-            $cart = $_SESSION['cart'] ?? [];
-            $cartKey = $this->getCartKey($data['product_id'], $data['variant_combination'] ?? null);
-            
-            if (isset($cart[$cartKey])) {
-                $cart[$cartKey]['quantity'] += $data['quantity'];
-            } else {
-                $cart[$cartKey] = [
-                    'product_id' => $data['product_id'],
-                    'quantity' => $data['quantity'],
-                    'variant_combination' => $data['variant_combination'] ?? null,
-                    'note' => $data['note'] ?? null
-                ];
-            }
-            
-            $_SESSION['cart'] = $cart;
-            
-            return $this->success([
-                'cart_count' => count($cart),
-                'message' => 'Đã thêm vào giỏ hàng'
-            ], 'Thêm vào giỏ hàng thành công');
+            return $this->success($result, 'Thêm vào giỏ hàng thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
         }
@@ -108,38 +55,17 @@ class CartController extends ApiController
     public function update()
     {
         try {
-            if (session_status() === PHP_SESSION_NONE) {
-                session_start();
-            }
-            
             $data = json_decode(file_get_contents('php://input'), true);
             
             if (!isset($data['product_id']) || !isset($data['quantity'])) {
                 return $this->error('Thiếu product_id hoặc quantity', 400);
             }
-            
-            $cart = $_SESSION['cart'] ?? [];
-            $cartKey = $this->getCartKey($data['product_id'], $data['variant_combination'] ?? null);
-            
-            if (!isset($cart[$cartKey])) {
+            $service = new CartService();
+            $result = $service->updateItem($data['product_id'], (int)$data['quantity']);
+            if ($result === false) {
                 return $this->error('Sản phẩm không có trong giỏ hàng', 404);
             }
-            
-            if ($data['quantity'] <= 0) {
-                unset($cart[$cartKey]);
-            } else {
-                $cart[$cartKey]['quantity'] = $data['quantity'];
-                if (isset($data['note'])) {
-                    $cart[$cartKey]['note'] = $data['note'];
-                }
-            }
-            
-            $_SESSION['cart'] = $cart;
-            
-            return $this->success([
-                'cart_count' => count($cart),
-                'message' => 'Cập nhật giỏ hàng thành công'
-            ], 'Cập nhật giỏ hàng thành công');
+            return $this->success($result, 'Cập nhật giỏ hàng thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
         }
@@ -152,28 +78,14 @@ class CartController extends ApiController
     public function remove()
     {
         try {
-            if (session_status() === PHP_SESSION_NONE) {
-                session_start();
-            }
-            
             $data = json_decode(file_get_contents('php://input'), true);
             
             if (!isset($data['product_id'])) {
                 return $this->error('Thiếu product_id', 400);
             }
-            
-            $cart = $_SESSION['cart'] ?? [];
-            $cartKey = $this->getCartKey($data['product_id'], $data['variant_combination'] ?? null);
-            
-            if (isset($cart[$cartKey])) {
-                unset($cart[$cartKey]);
-                $_SESSION['cart'] = $cart;
-            }
-            
-            return $this->success([
-                'cart_count' => count($cart),
-                'message' => 'Đã xóa khỏi giỏ hàng'
-            ], 'Xóa khỏi giỏ hàng thành công');
+            $service = new CartService();
+            $result = $service->removeItem($data['product_id']);
+            return $this->success($result, 'Xóa khỏi giỏ hàng thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
         }
@@ -186,13 +98,9 @@ class CartController extends ApiController
     public function clear()
     {
         try {
-            if (session_status() === PHP_SESSION_NONE) {
-                session_start();
-            }
-            
-            $_SESSION['cart'] = [];
-            
-            return $this->success([], 'Đã xóa toàn bộ giỏ hàng');
+            $service = new CartService();
+            $result = $service->clear();
+            return $this->success($result, 'Đã xóa toàn bộ giỏ hàng');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
         }

@@ -3,6 +3,7 @@
 namespace Rinnsan\RinnSanWeb\Middleware;
 
 use Rinnsan\RinnSanWeb\Models\User;
+use Rinnsan\RinnSanWeb\Services\AuthService;
 
 class AuthMiddleware extends Middleware
 {
@@ -16,13 +17,14 @@ class AuthMiddleware extends Middleware
         }
         
         $userId = $_SESSION['user_id'] ?? null;
-        
         if (!$userId) {
-            // Kiểm tra token trong header (nếu dùng JWT sau này)
             $token = $this->getBearerToken();
             if ($token) {
-                // Có thể verify JWT token ở đây
-                // Tạm thời return false
+                $auth = new AuthService();
+                $payload = $auth->verifyToken($token);
+                if ($payload && isset($payload['sub'])) {
+                    $userId = $payload['sub'];
+                }
             }
             
             http_response_code(401);

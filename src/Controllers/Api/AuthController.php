@@ -6,6 +6,7 @@ use Rinnsan\RinnSanWeb\Models\User;
 use Rinnsan\RinnSanWeb\Models\UserAddress;
 use Rinnsan\RinnSanWeb\Models\ActivityLog;
 use Rinnsan\RinnSanWeb\Core\Database;
+use Rinnsan\RinnSanWeb\Services\AuthService;
 
 class AuthController extends ApiController
 {
@@ -22,33 +23,20 @@ class AuthController extends ApiController
                 return $this->error('Thiếu email hoặc password', 400);
             }
             
-            $user = User::findByEmail($data['email']);
-            
-            if (!$user) {
+            $auth = new AuthService();
+            $result = $auth->login($data['email'], $data['password']);
+            if (!$result) {
                 return $this->error('Email hoặc mật khẩu không đúng', 401);
             }
-            
-            if (!password_verify($data['password'], $user['password'])) {
-                return $this->error('Email hoặc mật khẩu không đúng', 401);
+            if (isset($result['requires_2fa']) && $result['requires_2fa']) {
+                ActivityLog::log('user.login.2fa', 'Yêu cầu xác minh OTP', $result['user_id']);
+                return $this->success($result, 'Yêu cầu xác minh OTP');
             }
-            
-            if (!$user['is_active']) {
-                return $this->error('Tài khoản đã bị khóa', 403);
+            if (isset($result['user']['id'])) {
+                User::update($result['user']['id'], ['last_login_at' => date('Y-m-d H:i:s')]);
+                ActivityLog::log('user.login', "User {$result['user']['email']} đăng nhập", $result['user']['id']);
             }
-            
-            // Cập nhật last_login_at
-            User::update($user['id'], ['last_login_at' => date('Y-m-d H:i:s')]);
-            
-            // Ghi log
-            ActivityLog::log('user.login', "User {$user['email']} đăng nhập", $user['id']);
-            
-            // Loại bỏ password khỏi response
-            unset($user['password']);
-            
-            return $this->success([
-                'user' => $user,
-                'token' => $this->generateToken($user['id']) // Có thể implement JWT sau
-            ], 'Đăng nhập thành công');
+            return $this->success($result, 'Đăng nhập thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
         }
@@ -156,7 +144,7 @@ class AuthController extends ApiController
             $user = User::find($userId);
             unset($user['password']);
             
-            return $this->success(['user' => $user], 'Cập nhật thông tin thành công');
+            return $this->success(['user' => $user], 'Lấy thông tin user thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
         }
@@ -185,27 +173,19 @@ class AuthController extends ApiController
      */
     private function getCurrentUserId()
     {
-        // Có thể implement JWT token hoặc session
-        // Tạm thời dùng session
+        $headers = getallheaders();
+        $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? null;
+        if ($authHeader && preg_match('/Bearer\s+(.*)$/i', $authHeader, $m)) {
+            $auth = new AuthService();
+            $payload = $auth->verifyToken($m[1]);
+            if ($payload && isset($payload['sub'])) {
+                return $payload['sub'];
+            }
+        }
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
-        
         return $_SESSION['user_id'] ?? null;
-    }
-
-    /**
-     * Generate token (có thể implement JWT sau)
-     */
-    private function generateToken($userId)
-    {
-        // Tạm thời trả về session ID
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-        
-        $_SESSION['user_id'] = $userId;
-        return session_id();
     }
 }
 

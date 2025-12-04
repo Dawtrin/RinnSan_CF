@@ -9,6 +9,7 @@ use Rinnsan\RinnSanWeb\Models\User;
 use Rinnsan\RinnSanWeb\Models\Order;
 use Rinnsan\RinnSanWeb\Helpers\RequestHelper;
 use Rinnsan\RinnSanWeb\Core\Database;
+use Rinnsan\RinnSanWeb\Services\AdminBulkService;
 
 class AdminBulkController extends ApiController
 {
@@ -25,55 +26,16 @@ class AdminBulkController extends ApiController
                 return $this->error('Thiếu type hoặc ids', 400);
             }
             
-            $type = $data['type'];
-            $ids = $data['ids'];
-            $deleted = 0;
-            
-            switch ($type) {
-                case 'products':
-                    foreach ($ids as $id) {
-                        Product::delete($id);
-                        $deleted++;
-                    }
-                    break;
-                    
-                case 'categories':
-                    foreach ($ids as $id) {
-                        Category::delete($id);
-                        $deleted++;
-                    }
-                    break;
-                    
-                case 'users':
-                    // Không cho xóa chính mình
-                    if (session_status() === PHP_SESSION_NONE) {
-                        session_start();
-                    }
-                    $currentUserId = $_SESSION['user_id'] ?? null;
-                    
-                    foreach ($ids as $id) {
-                        if ($id != $currentUserId) {
-                            User::delete($id);
-                            $deleted++;
-                        }
-                    }
-                    break;
-                    
-                case 'orders':
-                    foreach ($ids as $id) {
-                        Order::delete($id);
-                        $deleted++;
-                    }
-                    break;
-                    
-                default:
-                    return $this->error('Type không hợp lệ', 400);
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
             }
-            
-            return $this->success([
-                'deleted_count' => $deleted,
-                'total_requested' => count($ids)
-            ], "Đã xóa {$deleted} items");
+            $currentUserId = $_SESSION['user_id'] ?? null;
+            $service = new AdminBulkService();
+            $result = $service->delete($data['type'], $data['ids'], $currentUserId);
+            if ($result === null) {
+                return $this->error('Type không hợp lệ', 400);
+            }
+            return $this->success($result, "Đã xóa {$result['deleted_count']} items");
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
         }
@@ -92,43 +54,16 @@ class AdminBulkController extends ApiController
                 return $this->error('Thiếu type, ids hoặc updates', 400);
             }
             
-            $type = $data['type'];
-            $ids = $data['ids'];
-            $updates = $data['updates'];
-            $updated = 0;
-            
-            switch ($type) {
-                case 'products':
-                    foreach ($ids as $id) {
-                        Product::update($id, $updates);
-                        $updated++;
-                    }
-                    break;
-                    
-                case 'categories':
-                    foreach ($ids as $id) {
-                        Category::update($id, $updates);
-                        $updated++;
-                    }
-                    break;
-                    
-                case 'users':
-                    foreach ($ids as $id) {
-                        // Không cho update password ở đây
-                        unset($updates['password']);
-                        User::update($id, $updates);
-                        $updated++;
-                    }
-                    break;
-                    
-                default:
-                    return $this->error('Type không hợp lệ', 400);
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
             }
-            
-            return $this->success([
-                'updated_count' => $updated,
-                'total_requested' => count($ids)
-            ], "Đã cập nhật {$updated} items");
+            $currentUserId = $_SESSION['user_id'] ?? null;
+            $service = new AdminBulkService();
+            $result = $service->update($data['type'], $data['ids'], $data['updates'], $currentUserId);
+            if ($result === null) {
+                return $this->error('Type không hợp lệ', 400);
+            }
+            return $this->success($result, "Đã cập nhật {$result['updated_count']} items");
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
         }
@@ -147,42 +82,16 @@ class AdminBulkController extends ApiController
                 return $this->error('Thiếu type, ids hoặc is_active', 400);
             }
             
-            $type = $data['type'];
-            $ids = $data['ids'];
-            $isActive = (int)$data['is_active'];
-            $updated = 0;
-            
-            switch ($type) {
-                case 'products':
-                    foreach ($ids as $id) {
-                        Product::update($id, ['is_active' => $isActive]);
-                        $updated++;
-                    }
-                    break;
-                    
-                case 'users':
-                    // Không cho khóa chính mình
-                    if (session_status() === PHP_SESSION_NONE) {
-                        session_start();
-                    }
-                    $currentUserId = $_SESSION['user_id'] ?? null;
-                    
-                    foreach ($ids as $id) {
-                        if ($id != $currentUserId) {
-                            User::update($id, ['is_active' => $isActive]);
-                            $updated++;
-                        }
-                    }
-                    break;
-                    
-                default:
-                    return $this->error('Type không hợp lệ', 400);
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
             }
-            
-            return $this->success([
-                'updated_count' => $updated,
-                'total_requested' => count($ids)
-            ], "Đã " . ($isActive ? 'kích hoạt' : 'khóa') . " {$updated} items");
+            $currentUserId = $_SESSION['user_id'] ?? null;
+            $service = new AdminBulkService();
+            $result = $service->activate($data['type'], $data['ids'], (int)$data['is_active'], $currentUserId);
+            if ($result === null) {
+                return $this->error('Type không hợp lệ', 400);
+            }
+            return $this->success($result, "Đã " . ((int)$data['is_active'] ? 'kích hoạt' : 'khóa') . " {$result['updated_count']} items");
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
         }

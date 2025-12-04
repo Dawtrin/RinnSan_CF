@@ -1,17 +1,18 @@
 <?php
 
 return [
-    'app_name' => 'RinnSan Web',
+    'app_name' => $_ENV['APP_NAME'] ?? 'RinnSan Web',
     'app_env' => $_ENV['APP_ENV'] ?? 'local',
-    'debug' => $_ENV['APP_DEBUG'] ?? false,
+    'debug' => filter_var($_ENV['APP_DEBUG'] ?? false, FILTER_VALIDATE_BOOLEAN),
     
     'database' => [
+        'type' => $_ENV['DB_TYPE'] ?? 'sqlsrv',
         'host' => $_ENV['DB_HOST'] ?? 'localhost',
-        'port' => $_ENV['DB_PORT'] ?? 3306,
-        'database' => $_ENV['DB_DATABASE'] ?? 'rinnsan_web',
-        'username' => $_ENV['DB_USERNAME'] ?? 'root',
+        'port' => $_ENV['DB_PORT'] ?? 1433,
+        'database' => $_ENV['DB_DATABASE'] ?? 'RinnSanCF',
+        'username' => $_ENV['DB_USERNAME'] ?? 'sa',
         'password' => $_ENV['DB_PASSWORD'] ?? '',
-        'charset' => 'utf8mb4',
+        'charset' => $_ENV['DB_CHARSET'] ?? 'utf8mb4',
     ],
     
     'cache' => [

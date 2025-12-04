@@ -6,6 +6,7 @@ use Rinnsan\RinnSanWeb\Controllers\Api\ApiController;
 use Rinnsan\RinnSanWeb\Models\Coupon;
 use Rinnsan\RinnSanWeb\Helpers\RequestHelper;
 use Rinnsan\RinnSanWeb\Core\Database;
+use Rinnsan\RinnSanWeb\Services\AdminCouponService;
 
 class AdminCouponController extends ApiController
 {
@@ -25,15 +26,11 @@ class AdminCouponController extends ApiController
                 }
             }
             
-            // Kiểm tra code đã tồn tại
-            $existing = Coupon::findByCode($data['code']);
-            if ($existing) {
+            $service = new AdminCouponService();
+            $coupon = $service->create($data);
+            if (!$coupon) {
                 return $this->error('Mã coupon đã tồn tại', 400);
             }
-            
-            Coupon::create($data);
-            $coupon = Coupon::find(Database::lastInsertId());
-            
             return $this->success($coupon, 'Tạo coupon thành công', 201);
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
@@ -47,16 +44,12 @@ class AdminCouponController extends ApiController
     public function update($id)
     {
         try {
-            $coupon = Coupon::find($id);
+            $data = RequestHelper::inputSanitized();
+            $service = new AdminCouponService();
+            $coupon = $service->update($id, $data);
             if (!$coupon) {
                 return $this->error('Coupon không tồn tại', 404);
             }
-            
-            $data = RequestHelper::inputSanitized();
-            
-            Coupon::update($id, $data);
-            $coupon = Coupon::find($id);
-            
             return $this->success($coupon, 'Cập nhật coupon thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
@@ -70,13 +63,11 @@ class AdminCouponController extends ApiController
     public function destroy($id)
     {
         try {
-            $coupon = Coupon::find($id);
-            if (!$coupon) {
+            $service = new AdminCouponService();
+            $result = $service->delete($id);
+            if ($result === null) {
                 return $this->error('Coupon không tồn tại', 404);
             }
-            
-            Coupon::delete($id);
-            
             return $this->success([], 'Xóa coupon thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);

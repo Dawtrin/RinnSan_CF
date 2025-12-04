@@ -6,6 +6,7 @@ use Rinnsan\RinnSanWeb\Controllers\Api\ApiController;
 use Rinnsan\RinnSanWeb\Models\Supplier;
 use Rinnsan\RinnSanWeb\Helpers\RequestHelper;
 use Rinnsan\RinnSanWeb\Core\Database;
+use Rinnsan\RinnSanWeb\Services\AdminSupplierService;
 
 class AdminSupplierController extends ApiController
 {
@@ -18,13 +19,9 @@ class AdminSupplierController extends ApiController
         try {
             $pagination = RequestHelper::getPaginationParams();
             $filters = RequestHelper::getFilters(['is_active']);
-            
-            $conditions = [];
-            if (isset($filters['is_active'])) {
-                $conditions['is_active'] = $filters['is_active'];
-            }
-            
-            $result = Supplier::paginate($pagination['page'], $pagination['per_page'], $conditions, 'name ASC');
+            $sort = RequestHelper::getSortParams('name', 'ASC');
+            $service = new AdminSupplierService();
+            $result = $service->paginate($pagination['page'], $pagination['per_page'], $filters, $sort);
             
             return $this->success($result['data'], 'Lấy danh sách suppliers thành công', 200, [
                 'pagination' => $result['pagination']
@@ -46,9 +43,11 @@ class AdminSupplierController extends ApiController
             if (!isset($data['name'])) {
                 return $this->error('Thiếu trường name', 400);
             }
-            
-            Supplier::create($data);
-            $supplier = Supplier::find(Database::lastInsertId());
+            $service = new AdminSupplierService();
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+            $supplier = $service->create($data, $_SESSION['user_id'] ?? null);
             
             return $this->success($supplier, 'Tạo supplier thành công', 201);
         } catch (\Exception $e) {
@@ -63,14 +62,15 @@ class AdminSupplierController extends ApiController
     public function update($id)
     {
         try {
-            $supplier = Supplier::find($id);
+            $data = RequestHelper::inputSanitized();
+            $service = new AdminSupplierService();
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+            $supplier = $service->update($id, $data, $_SESSION['user_id'] ?? null);
             if (!$supplier) {
                 return $this->error('Supplier không tồn tại', 404);
             }
-            
-            $data = RequestHelper::inputSanitized();
-            Supplier::update($id, $data);
-            $supplier = Supplier::find($id);
             
             return $this->success($supplier, 'Cập nhật supplier thành công');
         } catch (\Exception $e) {
@@ -85,13 +85,14 @@ class AdminSupplierController extends ApiController
     public function destroy($id)
     {
         try {
-            $supplier = Supplier::find($id);
-            if (!$supplier) {
+            $service = new AdminSupplierService();
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+            $deleted = $service->delete($id, $_SESSION['user_id'] ?? null);
+            if ($deleted === null) {
                 return $this->error('Supplier không tồn tại', 404);
             }
-            
-            Supplier::delete($id);
-            
             return $this->success([], 'Xóa supplier thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);

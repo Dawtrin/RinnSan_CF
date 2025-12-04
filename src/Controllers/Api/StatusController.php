@@ -1,6 +1,7 @@
 <?php
 
 namespace Rinnsan\RinnSanWeb\Controllers\Api;
+use Rinnsan\RinnSanWeb\Core\Database;
 
 class StatusController extends ApiController
 {
@@ -34,11 +35,9 @@ class StatusController extends ApiController
     protected function checkDatabase()
     {
         try {
-            $pdo = new \PDO(
-                "mysql:host=" . $_ENV['DB_HOST'] . ";port=" . $_ENV['DB_PORT'],
-                $_ENV['DB_USERNAME'],
-                $_ENV['DB_PASSWORD']
-            );
+            $db = Database::getInstance()->getConnection();
+            $stmt = $db->query('SELECT 1');
+            $stmt->fetch();
             return 'connected';
         } catch (\Exception $e) {
             return 'disconnected';

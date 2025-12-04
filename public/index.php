@@ -11,33 +11,9 @@ try {
     $app = Rinnsan\RinnSanWeb\Core\Application::getInstance();
     $router = $app->getRouter();
 
-    // Test route
-    $router->get('/', function() {
-        echo "<h1>🎉 RINNSAN_WEB BACKEND ĐANG CHẠY!</h1>";
-        echo "<p>✅ PHP Version: " . PHP_VERSION . "</p>";
-        echo "<p>✅ Server Time: " . date('Y-m-d H:i:s') . "</p>";
-        
-        try {
-            $db = Rinnsan\RinnSanWeb\Core\Database::getInstance();
-            echo "<p>✅ Database: Connected</p>";
-            
-            // Test SQL Server query
-            $tables = Rinnsan\RinnSanWeb\Core\Database::fetchAll("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES");
-            echo "<p>✅ SQL Server: " . count($tables) . " tables found</p>";
-        } catch (Exception $e) {
-            echo "<p>❌ Database: " . $e->getMessage() . "</p>";
-        }
-    });
-
-    // Health check
-    $router->get('/health', function() {
-        header('Content-Type: application/json');
-        echo json_encode([
-            'status' => 'healthy',
-            'timestamp' => date('Y-m-d H:i:s'),
-            'service' => 'RINNSAN_WEB Backend'
-        ]);
-    });
+    // Load routes
+    require_once __DIR__ . '/../routes/web.php';
+    require_once __DIR__ . '/../routes/api.php';
 
     $app->run();
 

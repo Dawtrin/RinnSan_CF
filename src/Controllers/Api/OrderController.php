@@ -7,6 +7,7 @@ use Rinnsan\RinnSanWeb\Models\OrderItem;
 use Rinnsan\RinnSanWeb\Models\Product;
 use Rinnsan\RinnSanWeb\Models\Coupon;
 use Rinnsan\RinnSanWeb\Core\Database;
+use Rinnsan\RinnSanWeb\Services\OrderService;
 
 class OrderController extends ApiController
 {
@@ -20,15 +21,14 @@ class OrderController extends ApiController
             $userId = $_GET['user_id'] ?? null;
             $status = $_GET['status'] ?? null;
             $limit = (int)($_GET['limit'] ?? 20);
-            
+            $service = new OrderService();
             if ($userId) {
-                $orders = Order::getByUserId($userId, $limit);
+                $orders = $service->getByUser($userId, $limit);
             } elseif ($status) {
-                $orders = Order::getByStatus($status, $limit);
+                $orders = $service->getByStatus($status, $limit);
             } else {
-                $orders = Order::getByStatus('pending', $limit);
+                $orders = $service->getByStatus('pending', $limit);
             }
-            
             return $this->success($orders, 'Lấy danh sách đơn hàng thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
@@ -66,92 +66,23 @@ class OrderController extends ApiController
             if (!$data || !isset($data['items']) || empty($data['items'])) {
                 return $this->error('Dữ liệu không hợp lệ. Cần có items', 400);
             }
-            
-            // Tính toán tổng tiền
-            $subtotal = 0;
-            $quantityTotal = 0;
-            
-            foreach ($data['items'] as $item) {
-                $product = Product::find($item['product_id']);
-                if (!$product) {
-                    return $this->error("Sản phẩm ID {$item['product_id']} không tồn tại", 400);
-                }
-                
-                $price = $product['price'];
-                if (isset($item['variant_combination'])) {
-                    // Có thể tính thêm giá từ variant nếu cần
-                }
-                
-                $itemTotal = $price * $item['quantity'];
-                $subtotal += $itemTotal;
-                $quantityTotal += $item['quantity'];
-            }
-            
-            // Áp dụng coupon nếu có
-            $discountAmount = 0;
-            if (isset($data['coupon_code']) && $data['coupon_code']) {
-                $couponValidation = Coupon::validateCoupon($data['coupon_code'], $subtotal);
-                if ($couponValidation['valid']) {
-                    $discountAmount = Coupon::calculateDiscount($couponValidation['coupon'], $subtotal);
-                    Coupon::incrementUsage($couponValidation['coupon']['id']);
-                } else {
-                    return $this->error($couponValidation['message'], 400);
-                }
-            }
-            
-            // Tính phí ship và thuế
-            $shippingFee = $data['shipping_fee'] ?? 0;
-            $taxAmount = $data['tax_amount'] ?? 0;
-            $totalAmount = $subtotal - $discountAmount + $shippingFee + $taxAmount;
-            
-            // Tạo đơn hàng
-            $orderData = [
+            $service = new OrderService();
+            $order = $service->create([
                 'user_id' => $data['user_id'] ?? null,
-                'customer_name' => $data['customer_name'] ?? 'Khách hàng',
-                'customer_phone' => $data['customer_phone'] ?? '',
-                'customer_email' => $data['customer_email'] ?? null,
-                'shipping_address' => $data['shipping_address'] ?? null,
-                'item_count' => count($data['items']),
-                'quantity_total' => $quantityTotal,
-                'subtotal' => $subtotal,
-                'discount_amount' => $discountAmount,
-                'shipping_fee' => $shippingFee,
-                'tax_amount' => $taxAmount,
-                'total_amount' => $totalAmount,
-                'order_status' => 'pending',
-                'payment_status' => 'pending',
+                'items' => $data['items'],
+                'customer' => [
+                    'name' => $data['customer_name'] ?? 'Khách hàng',
+                    'phone' => $data['customer_phone'] ?? '',
+                    'email' => $data['customer_email'] ?? null,
+                    'shipping_address' => $data['shipping_address'] ?? null,
+                ],
+                'shipping_fee' => $data['shipping_fee'] ?? 0,
+                'discount_amount' => isset($data['coupon_code']) ? 0 : ($data['discount_amount'] ?? 0),
                 'payment_method' => $data['payment_method'] ?? null,
-                'note' => $data['note'] ?? null
-            ];
-            
-            $order = Order::createOrder($orderData);
-            $orderId = Database::lastInsertId();
-            
-            // Tạo order items
-            foreach ($data['items'] as $item) {
-                $product = Product::find($item['product_id']);
-                $price = $product['price'];
-                
-                $itemData = [
-                    'order_id' => $orderId,
-                    'product_id' => $item['product_id'],
-                    'product_name' => $product['name'],
-                    'product_price' => $price,
-                    'variant_combination' => isset($item['variant_combination']) 
-                        ? json_encode($item['variant_combination']) : null,
-                    'quantity' => $item['quantity'],
-                    'total_price' => $price * $item['quantity'],
-                    'note' => $item['note'] ?? null
-                ];
-                
-                OrderItem::create($itemData);
-                
-                // Cập nhật số lượng đã bán
-                Product::incrementSold($item['product_id'], $item['quantity']);
+            ]);
+            if (!$order) {
+                return $this->error('Không thể tạo đơn hàng', 400);
             }
-            
-            $order = Order::findWithItems($orderId);
-            
             return $this->success($order, 'Tạo đơn hàng thành công', 201);
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
@@ -165,19 +96,15 @@ class OrderController extends ApiController
     public function updateStatus($id)
     {
         try {
-            $order = Order::find($id);
-            if (!$order) {
-                return $this->error('Đơn hàng không tồn tại', 404);
-            }
-            
             $data = json_decode(file_get_contents('php://input'), true);
             if (!isset($data['status'])) {
                 return $this->error('Thiếu trường status', 400);
             }
-            
-            Order::updateStatus($id, $data['status'], $data['reason'] ?? null);
-            $order = Order::findWithItems($id);
-            
+            $service = new OrderService();
+            $order = $service->updateStatus($id, $data['status'], $data['reason'] ?? null);
+            if (!$order) {
+                return $this->error('Đơn hàng không tồn tại', 404);
+            }
             return $this->success($order, 'Cập nhật trạng thái đơn hàng thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
@@ -194,7 +121,8 @@ class OrderController extends ApiController
             $startDate = $_GET['start_date'] ?? null;
             $endDate = $_GET['end_date'] ?? null;
             
-            $stats = Order::getStatistics($startDate, $endDate);
+            $service = new OrderService();
+            $stats = $service->statistics($startDate, $endDate);
             
             return $this->success($stats, 'Lấy thống kê thành công');
         } catch (\Exception $e) {

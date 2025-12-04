@@ -3,6 +3,7 @@
 namespace Rinnsan\RinnSanWeb\Controllers\Api;
 
 use Rinnsan\RinnSanWeb\Models\Settings;
+use Rinnsan\RinnSanWeb\Services\SettingsService;
 
 class SettingsController extends ApiController
 {
@@ -13,7 +14,8 @@ class SettingsController extends ApiController
     public function index()
     {
         try {
-            $settings = Settings::getAll();
+            $service = new SettingsService();
+            $settings = $service->all();
             return $this->success($settings, 'Lấy settings thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
@@ -27,7 +29,8 @@ class SettingsController extends ApiController
     public function show($key)
     {
         try {
-            $value = Settings::get($key);
+            $service = new SettingsService();
+            $value = $service->get($key);
             return $this->success(['key' => $key, 'value' => $value], 'Lấy setting thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
@@ -46,13 +49,9 @@ class SettingsController extends ApiController
             if (!isset($data['key']) || !isset($data['value'])) {
                 return $this->error('Thiếu key hoặc value', 400);
             }
-            
-            Settings::set($data['key'], $data['value'], $data['description'] ?? null);
-            
-            return $this->success([
-                'key' => $data['key'],
-                'value' => $data['value']
-            ], 'Cập nhật setting thành công');
+            $service = new SettingsService();
+            $result = $service->set($data['key'], $data['value'], $data['description'] ?? null);
+            return $this->success($result, 'Cập nhật setting thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
         }
@@ -70,11 +69,8 @@ class SettingsController extends ApiController
             if (!is_array($data)) {
                 return $this->error('Dữ liệu phải là object', 400);
             }
-            
-            foreach ($data as $key => $value) {
-                Settings::set($key, $value);
-            }
-            
+            $service = new SettingsService();
+            $service->batchSet($data);
             return $this->success([], 'Cập nhật settings thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);

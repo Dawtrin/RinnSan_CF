@@ -186,8 +186,6 @@ class Router
     private function handle404(): void
     {
         http_response_code(404);
-        
-        // Check if it's an API request
         if (strpos($_SERVER['REQUEST_URI'], '/api/') !== false) {
             header('Content-Type: application/json');
             echo json_encode([
@@ -195,8 +193,22 @@ class Router
                 'message' => 'Endpoint không tồn tại',
                 'data' => []
             ]);
-        } else {
-            echo "404 - Page not found";
+            return;
         }
+        $manifestPath = __DIR__ . '/../../public/dist/manifest.json';
+        $manifest = file_exists($manifestPath) ? json_decode(file_get_contents($manifestPath), true) : null;
+        $entryJs = $manifest['resources/src/main.jsx']['file'] ?? null;
+        $cssFiles = $manifest['resources/src/main.jsx']['css'] ?? [];
+        if ($entryJs) {
+            echo '<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">';
+            foreach ($cssFiles as $css) {
+                echo '<link rel="stylesheet" href="/dist/' . htmlspecialchars($css) . '">';
+            }
+            echo '<title>RinnSan Web</title></head><body><div id="root"></div>';
+            echo '<script type="module" src="/dist/' . htmlspecialchars($entryJs) . '"></script>';
+            echo '</body></html>';
+            return;
+        }
+        echo "404 - Page not found";
     }
 }

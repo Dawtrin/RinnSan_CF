@@ -5,6 +5,7 @@ namespace Rinnsan\RinnSanWeb\Controllers\Api;
 use Rinnsan\RinnSanWeb\Models\Inventory;
 use Rinnsan\RinnSanWeb\Models\InventoryTransaction;
 use Rinnsan\RinnSanWeb\Core\Database;
+use Rinnsan\RinnSanWeb\Services\InventoryService;
 
 class InventoryController extends ApiController
 {
@@ -15,7 +16,8 @@ class InventoryController extends ApiController
     public function index()
     {
         try {
-            $inventory = Inventory::getAllActive();
+            $service = new InventoryService();
+            $inventory = $service->list();
             return $this->success($inventory, 'Lấy danh sách kho thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
@@ -29,15 +31,11 @@ class InventoryController extends ApiController
     public function show($id)
     {
         try {
-            $inventory = Inventory::find($id);
-            
+            $service = new InventoryService();
+            $inventory = $service->get($id);
             if (!$inventory) {
                 return $this->error('Nguyên liệu không tồn tại', 404);
             }
-            
-            // Lấy transactions
-            $inventory['transactions'] = InventoryTransaction::getByInventoryId($id, 20);
-            
             return $this->success($inventory, 'Lấy chi tiết kho thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
@@ -57,20 +55,13 @@ class InventoryController extends ApiController
                 return $this->error('Thiếu inventory_id, type hoặc quantity', 400);
             }
             
-            // Lấy user từ session
             if (session_status() === PHP_SESSION_NONE) {
                 session_start();
             }
-            $userId = $_SESSION['user_id'] ?? 1; // Default to 1 if not logged in
-            
-            $data['created_by'] = $userId;
-            
-            $transaction = InventoryTransaction::createTransaction($data);
-            
-            return $this->success([
-                'transaction_id' => Database::lastInsertId(),
-                'message' => 'Tạo transaction thành công'
-            ], 'Tạo transaction thành công', 201);
+            $userId = $_SESSION['user_id'] ?? 1;
+            $service = new InventoryService();
+            $result = $service->createTransaction($data, $userId);
+            return $this->success($result, 'Tạo transaction thành công', 201);
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
         }
@@ -83,7 +74,8 @@ class InventoryController extends ApiController
     public function lowStock()
     {
         try {
-            $items = Inventory::getLowStock();
+            $service = new InventoryService();
+            $items = $service->lowStock();
             return $this->success($items, 'Lấy danh sách sắp hết hàng thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
@@ -102,10 +94,8 @@ class InventoryController extends ApiController
             if (!isset($data['name'])) {
                 return $this->error('Thiếu trường name', 400);
             }
-            
-            Inventory::create($data);
-            $inventory = Inventory::find(Database::lastInsertId());
-            
+            $service = new InventoryService();
+            $inventory = $service->create($data);
             return $this->success($inventory, 'Tạo inventory thành công', 201);
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
@@ -119,15 +109,12 @@ class InventoryController extends ApiController
     public function update($id)
     {
         try {
-            $inventory = Inventory::find($id);
+            $data = \Rinnsan\RinnSanWeb\Helpers\RequestHelper::inputSanitized();
+            $service = new InventoryService();
+            $inventory = $service->update($id, $data);
             if (!$inventory) {
                 return $this->error('Inventory không tồn tại', 404);
             }
-            
-            $data = \Rinnsan\RinnSanWeb\Helpers\RequestHelper::inputSanitized();
-            Inventory::update($id, $data);
-            $inventory = Inventory::find($id);
-            
             return $this->success($inventory, 'Cập nhật inventory thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
@@ -141,13 +128,12 @@ class InventoryController extends ApiController
     public function destroy($id)
     {
         try {
+            $service = new InventoryService();
             $inventory = Inventory::find($id);
             if (!$inventory) {
                 return $this->error('Inventory không tồn tại', 404);
             }
-            
-            Inventory::delete($id);
-            
+            $service->delete($id);
             return $this->success([], 'Xóa inventory thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);

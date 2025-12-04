@@ -5,6 +5,7 @@ namespace Rinnsan\RinnSanWeb\Controllers\Api;
 use Rinnsan\RinnSanWeb\Models\Category;
 use Rinnsan\RinnSanWeb\Models\Product;
 use Rinnsan\RinnSanWeb\Core\Database;
+use Rinnsan\RinnSanWeb\Services\CategoryService;
 
 class CategoryController extends ApiController
 {
@@ -17,15 +18,8 @@ class CategoryController extends ApiController
         try {
             $withCount = isset($_GET['with_count']) && $_GET['with_count'] == '1';
             $parentOnly = isset($_GET['parent_only']) && $_GET['parent_only'] == '1';
-            
-            if ($withCount) {
-                $categories = Category::getAllWithProductCount();
-            } elseif ($parentOnly) {
-                $categories = Category::getParents();
-            } else {
-                $categories = Category::getAllActive();
-            }
-            
+            $service = new CategoryService();
+            $categories = $service->list($withCount, $parentOnly);
             return $this->success($categories, 'Lấy danh sách danh mục thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
@@ -39,20 +33,11 @@ class CategoryController extends ApiController
     public function show($id)
     {
         try {
-            $category = Category::find($id);
-            
+            $service = new CategoryService();
+            $category = $service->get($id);
             if (!$category) {
                 return $this->error('Danh mục không tồn tại', 404);
             }
-            
-            // Lấy sản phẩm trong danh mục
-            $category['products'] = Product::getByCategory($id);
-            
-            // Lấy danh mục con nếu có
-            if (!$category['parent_id']) {
-                $category['children'] = Category::getChildren($id);
-            }
-            
             return $this->success($category, 'Lấy chi tiết danh mục thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
@@ -66,14 +51,11 @@ class CategoryController extends ApiController
     public function showBySlug($slug)
     {
         try {
-            $category = Category::findBySlug($slug);
-            
+            $service = new CategoryService();
+            $category = $service->getBySlug($slug);
             if (!$category) {
                 return $this->error('Danh mục không tồn tại', 404);
             }
-            
-            $category['products'] = Product::getByCategory($category['id']);
-            
             return $this->success($category, 'Lấy danh mục thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
@@ -100,9 +82,8 @@ class CategoryController extends ApiController
                 }
             }
             
-            Category::create($data);
-            $category = Category::find(Database::lastInsertId());
-            
+            $service = new CategoryService();
+            $category = $service->create($data);
             return $this->success($category, 'Tạo danh mục thành công', 201);
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
@@ -116,19 +97,15 @@ class CategoryController extends ApiController
     public function update($id)
     {
         try {
-            $category = Category::find($id);
-            if (!$category) {
-                return $this->error('Danh mục không tồn tại', 404);
-            }
-            
             $data = json_decode(file_get_contents('php://input'), true);
             if (!$data) {
                 return $this->error('Dữ liệu không hợp lệ', 400);
             }
-            
-            Category::update($id, $data);
-            $category = Category::find($id);
-            
+            $service = new CategoryService();
+            $category = $service->update($id, $data);
+            if (!$category) {
+                return $this->error('Danh mục không tồn tại', 404);
+            }
             return $this->success($category, 'Cập nhật danh mục thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);

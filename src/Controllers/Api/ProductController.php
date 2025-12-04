@@ -7,6 +7,7 @@ use Rinnsan\RinnSanWeb\Core\Database;
 use Rinnsan\RinnSanWeb\Helpers\RequestHelper;
 use Rinnsan\RinnSanWeb\Helpers\PaginationHelper;
 use Rinnsan\RinnSanWeb\Helpers\CacheHelper;
+use Rinnsan\RinnSanWeb\Services\ProductService;
 
 class ProductController extends ApiController
 {
@@ -23,41 +24,22 @@ class ProductController extends ApiController
             $pagination = RequestHelper::getPaginationParams();
             $filters = RequestHelper::getFilters(['category_id', 'is_featured', 'is_active']);
             $sort = RequestHelper::getSortParams('created_at', 'DESC');
-            
-            // Cache key
-            $cacheKey = 'products_' . md5(json_encode([$categoryId, $featured, $search, $pagination, $filters, $sort]));
-            
-            // Try cache first
-            $products = CacheHelper::remember($cacheKey, function() use ($categoryId, $featured, $search, $pagination, $filters, $sort) {
-                if ($search) {
-                    return Product::search($search, $pagination['per_page']);
-                } elseif ($featured) {
-                    return Product::getFeatured($pagination['per_page']);
-                } elseif ($categoryId) {
-                    return Product::getByCategory($categoryId);
-                } else {
-                    // Use pagination
-                    $conditions = [];
-                    if (isset($filters['is_active'])) {
-                        $conditions['is_active'] = $filters['is_active'];
-                    }
-                    if (isset($filters['is_featured'])) {
-                        $conditions['is_featured'] = $filters['is_featured'];
-                    }
-                    
-                    $result = Product::paginate($pagination['page'], $pagination['per_page'], $conditions, $sort['sort'] . ' ' . $sort['order']);
-                    return $result;
-                }
-            }, 300); // Cache 5 minutes
-            
-            // Format response
+
+            $service = new ProductService();
+            $products = $service->list([
+                'pagination' => $pagination,
+                'filters' => $filters,
+                'sort' => $sort,
+                'search' => $search,
+                'featured' => $featured,
+                'category_id' => $categoryId
+            ]);
+
             if (isset($products['data'])) {
-                // Paginated result
                 return $this->success($products['data'], 'Lấy danh sách sản phẩm thành công', 200, [
                     'pagination' => $products['pagination']
                 ]);
             } else {
-                // Simple array
                 return $this->success($products, 'Lấy danh sách sản phẩm thành công');
             }
         } catch (\Exception $e) {
@@ -72,24 +54,12 @@ class ProductController extends ApiController
     public function show($id)
     {
         try {
-            $product = Product::findWithCategory($id);
-            
+            $service = new ProductService();
+            $product = $service->get($id);
+
             if (!$product) {
                 return $this->error('Sản phẩm không tồn tại', 404);
             }
-            
-            // Lấy variants và options
-            $product['variants'] = Product::getVariants($id);
-            $product['options'] = Product::getOptions($id);
-            
-            // Parse JSON fields
-            if (isset($product['images']) && is_string($product['images'])) {
-                $product['images'] = json_decode($product['images'], true) ?: [];
-            }
-            if (isset($product['tags']) && is_string($product['tags'])) {
-                $product['tags'] = json_decode($product['tags'], true) ?: [];
-            }
-            
             return $this->success($product, 'Lấy chi tiết sản phẩm thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
@@ -117,17 +87,8 @@ class ProductController extends ApiController
                 }
             }
             
-            // Convert arrays to JSON
-            if (isset($data['images']) && is_array($data['images'])) {
-                $data['images'] = json_encode($data['images']);
-            }
-            if (isset($data['tags']) && is_array($data['tags'])) {
-                $data['tags'] = json_encode($data['tags']);
-            }
-            
-            Product::create($data);
-            $product = Product::findWithCategory(Database::lastInsertId());
-            
+            $service = new ProductService();
+            $product = $service->create($data);
             return $this->success($product, 'Tạo sản phẩm thành công', 201);
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
@@ -151,17 +112,8 @@ class ProductController extends ApiController
                 return $this->error('Dữ liệu không hợp lệ', 400);
             }
             
-            // Convert arrays to JSON
-            if (isset($data['images']) && is_array($data['images'])) {
-                $data['images'] = json_encode($data['images']);
-            }
-            if (isset($data['tags']) && is_array($data['tags'])) {
-                $data['tags'] = json_encode($data['tags']);
-            }
-            
-            Product::update($id, $data);
-            $product = Product::findWithCategory($id);
-            
+            $service = new ProductService();
+            $product = $service->update($id, $data);
             return $this->success($product, 'Cập nhật sản phẩm thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
@@ -234,8 +186,8 @@ class ProductController extends ApiController
                 return $this->error('Sản phẩm không tồn tại', 404);
             }
             
-            Product::delete($id);
-            
+            $service = new ProductService();
+            $service->delete($id);
             return $this->success([], 'Xóa sản phẩm thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);

@@ -2,6 +2,7 @@
 
 namespace Rinnsan\RinnSanWeb\Controllers\Api;
 
+use Rinnsan\RinnSanWeb\Services\AdminService;
 use Rinnsan\RinnSanWeb\Models\Order;
 use Rinnsan\RinnSanWeb\Models\Product;
 use Rinnsan\RinnSanWeb\Models\User;
@@ -16,6 +17,9 @@ class AdminController extends ApiController
     public function dashboard()
     {
         try {
+            $service = new AdminService();
+            $dashboard = $service->dashboard();
+            return $this->success($dashboard, 'Lấy dashboard thành công');
             // Tổng quan
             $totalProducts = count(Product::all());
             $totalOrders = count(Order::all());
@@ -73,6 +77,9 @@ class AdminController extends ApiController
         try {
             $startDate = $_GET['start_date'] ?? date('Y-m-01');
             $endDate = $_GET['end_date'] ?? date('Y-m-d');
+            $service = new AdminService();
+            $result = $service->statistics($startDate, $endDate);
+            return $this->success($result, 'Lấy thống kê thành công');
             
             $stats = Order::getStatistics($startDate . ' 00:00:00', $endDate . ' 23:59:59');
             
@@ -118,6 +125,11 @@ class AdminController extends ApiController
         try {
             $pagination = \Rinnsan\RinnSanWeb\Helpers\RequestHelper::getPaginationParams();
             $status = $_GET['status'] ?? null;
+            $service = new AdminService();
+            $result = $service->recentOrders($pagination['page'], $pagination['per_page'], $status);
+            return $this->success($result['data'], 'Lấy đơn hàng thành công', 200, [
+                'pagination' => $result['pagination']
+            ]);
             
             $conditions = [];
             if ($status) {
@@ -152,19 +164,11 @@ class AdminController extends ApiController
     {
         try {
             $limit = (int)($_GET['limit'] ?? 10);
+            $service = new AdminService();
+            $products = $service->topSellingProducts($limit);
+            return $this->success($products, 'Lấy top sản phẩm thành công');
             
-            $products = Database::fetchAll("
-                SELECT TOP $limit
-                    p.id, p.name, p.price, p.sku,
-                    SUM(oi.quantity) as total_sold,
-                    SUM(oi.total_price) as total_revenue,
-                    COUNT(DISTINCT oi.order_id) as order_count
-                FROM products p
-                LEFT JOIN order_items oi ON p.id = oi.product_id
-                LEFT JOIN orders o ON oi.order_id = o.id AND o.order_status = 'completed'
-                GROUP BY p.id, p.name, p.price, p.sku
-                ORDER BY total_sold DESC
-            ");
+            $products = Database::fetchAll("\n                SELECT TOP $limit\n                    p.id, p.name, p.price, p.sku,\n                    SUM(oi.quantity) as total_sold,\n                    SUM(oi.total_price) as total_revenue,\n                    COUNT(DISTINCT oi.order_id) as order_count\n                FROM products p\n                LEFT JOIN order_items oi ON p.id = oi.product_id\n                LEFT JOIN orders o ON oi.order_id = o.id AND o.order_status = 'completed'\n                GROUP BY p.id, p.name, p.price, p.sku\n                ORDER BY total_sold DESC\n            ");
             
             return $this->success($products, 'Lấy top sản phẩm thành công');
         } catch (\Exception $e) {
