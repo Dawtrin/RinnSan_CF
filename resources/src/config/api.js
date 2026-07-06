@@ -5,8 +5,10 @@
  */
 export const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 
-/** Bật mock data khi deploy FE không có backend */
-export const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
+/** Bật mock khi: env bật tay, hoặc production không có backend URL */
+export const USE_MOCK =
+  import.meta.env.VITE_USE_MOCK === 'true' ||
+  (import.meta.env.PROD && !import.meta.env.VITE_API_URL);
 
 export function apiUrl(path) {
   const normalized = path.startsWith('/') ? path : `/${path}`;

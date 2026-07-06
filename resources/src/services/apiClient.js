@@ -97,6 +97,18 @@ export async function apiFetch(path, init = {}) {
     return mockResponse(normalized, method, init);
   }
 
-  const res = await fetch(apiUrl(normalized), init);
-  return res.json();
+  try {
+    const res = await fetch(apiUrl(normalized), init);
+    const json = await res.json();
+    if (json?.success !== false && (res.ok || json?.data)) return json;
+  } catch {
+    // fallback below
+  }
+
+  // Production FE-only: fallback mock nếu API không có
+  if (import.meta.env.PROD) {
+    return mockResponse(normalized, method, init);
+  }
+
+  throw new Error(`Không thể kết nối API: ${normalized}`);
 }
