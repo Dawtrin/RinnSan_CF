@@ -72,7 +72,9 @@ curl http://localhost:8000/api/health
 
 # Test products
 curl http://localhost:8000/api/products
-```
+
+http://localhost:5173/admin/login
+
 
 ### 2. Frontend Integration
 ```javascript

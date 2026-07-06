@@ -22,3 +22,25 @@ Thumbs.db
 .vscode/
 .idea/
 *.sublime-project
+
+# --- Ignore admin & database (final) ---
+
+# Database
+database/
+
+# FE - Admin
+resources/src/pages/Admin/
+resources/src/components/AdminLayout.jsx
+
+# BE - Admin API
+src/Controllers/Api/Admin/
+
+# BE - Admin Services
+src/Services/AdminCouponService.js
+src/Services/AdminOrderService.js
+src/Services/AdminProductService.js
+src/Services/AdminUserService.js
+src/Services/AdminDashboardService.js
+src/Services/AdminCategoryService.js
+src/Services/AdminSupplierService.js
+

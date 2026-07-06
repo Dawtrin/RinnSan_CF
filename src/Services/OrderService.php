@@ -2,102 +2,136 @@
 
 namespace Rinnsan\RinnSanWeb\Services;
 
-use Rinnsan\RinnSanWeb\Models\Order;
-use Rinnsan\RinnSanWeb\Models\OrderItem;
-use Rinnsan\RinnSanWeb\Models\Product;
 use Rinnsan\RinnSanWeb\Core\Database;
 
-class OrderService extends Service
+class OrderService
 {
-    public function create($payload)
+    public function create($data)
     {
-        $userId = $payload['user_id'] ?? null;
-        $items = $payload['items'] ?? [];
-        $customer = $payload['customer'] ?? [];
-        $shippingFee = $payload['shipping_fee'] ?? 0;
-        $discountAmount = $payload['discount_amount'] ?? 0;
-        $taxRate = (float)($_ENV['TAX_RATE'] ?? 0);
-        if (empty($items)) {
-            return null;
-        }
-        $buildItems = [];
-        $subtotal = 0;
-        $totalQuantity = 0;
-        foreach ($items as $item) {
-            $productId = $item['product_id'];
-            $quantity = (int)$item['quantity'];
-            $note = $item['note'] ?? null;
-            $variant = $item['variant_combination'] ?? null;
-            $product = Product::find($productId);
-            if (!$product) {
-                continue;
+        try {
+            // 1. Tính toán lại tiền (Bảo mật)
+            $buildItems = [];
+            $subtotal = 0;
+            $totalQuantity = 0;
+
+            foreach ($data['items'] as $item) {
+                $prodId = $item['product_id'] ?? null;
+                if (!$prodId) continue;
+
+                // Lấy giá từ DB
+                $product = Database::fetch("SELECT id, name, price FROM products WHERE id = ?", [$prodId]);
+                
+                if ($product) {
+                    $qty = (int)($item['quantity'] ?? 1);
+                    $price = (float)$product['price'];
+                    $total = $price * $qty;
+                    
+                    $variant = $item['options'] ?? [];
+                    $variantStr = is_string($variant) ? $variant : json_encode($variant, JSON_UNESCAPED_UNICODE);
+
+                    $buildItems[] = [
+                        'product_id' => $prodId,
+                        'product_name' => $product['name'],
+                        'product_price' => $price,
+                        'variant_combination' => $variantStr,
+                        'quantity' => $qty,
+                        'total_price' => $total,
+                        'note' => $item['note'] ?? ''
+                    ];
+
+                    $subtotal += $total;
+                    $totalQuantity += $qty;
+                }
             }
-            $price = (float)$product['price'];
-            $total = $price * $quantity;
-            $buildItems[] = [
-                'product_id' => $productId,
-                'product_name' => $product['name'],
-                'product_price' => $price,
-                'variant_combination' => is_array($variant) ? json_encode($variant) : $variant,
-                'quantity' => $quantity,
-                'total_price' => $total,
-                'note' => $note,
+
+            if (empty($buildItems)) throw new \Exception("Không có sản phẩm hợp lệ");
+
+            // 2. Tính tổng tiền cuối
+            $shippingFee = (float)($data['shipping_fee'] ?? 0);
+            $discountAmount = (float)($data['discount_amount'] ?? 0);
+            $totalAmount = max(0, $subtotal + $shippingFee - $discountAmount);
+
+            // 3. Tạo Mã Đơn Hàng
+            $prefix = 'CAFE-' . date('Ymd') . '-';
+            $countRes = Database::fetch("SELECT COUNT(*) as c FROM orders WHERE order_code LIKE ?", ["$prefix%"]);
+            $nextId = ($countRes['c'] ?? 0) + 1;
+            $orderCode = $prefix . str_pad($nextId, 4, '0', STR_PAD_LEFT);
+
+            // 4. INSERT Đơn Hàng
+            $sqlOrder = "INSERT INTO orders (
+                order_code, user_id, customer_name, customer_phone, customer_email,
+                shipping_address, note, item_count, quantity_total, subtotal,
+                discount_amount, shipping_fee, tax_amount, total_amount,
+                order_status, payment_status, payment_method, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE(), GETDATE())";
+
+            $customerName = $data['customer_name'] ?? 'Khách lẻ';
+            $customerPhone = $data['customer_phone'] ?? '';
+            $note = $data['note'] ?? '';
+            if (!empty($data['coupon_code'])) $note .= " [Voucher: {$data['coupon_code']}]";
+
+            Database::query($sqlOrder, [
+                $orderCode,
+                $data['user_id'] ?? null,
+                $customerName,
+                $customerPhone,
+                $data['customer_email'] ?? '',
+                $data['shipping_address'] ?? '',
+                $note,
+                count($buildItems),
+                $totalQuantity,
+                $subtotal,
+                $discountAmount,
+                $shippingFee,
+                0,
+                $totalAmount,
+                'pending',
+                'unpaid',
+                $data['payment_method'] ?? 'cash'
+            ]);
+
+            // 5. [FIX LỖI] LẤY ID VỪA TẠO (SQL SERVER)
+            // Thay vì dùng lastInsertId() (bị lỗi), ta dùng query trực tiếp
+            $lastIdRow = Database::fetch("SELECT CAST(@@IDENTITY AS INT) as id"); // Hoặc SCOPE_IDENTITY()
+            $orderId = $lastIdRow['id'] ?? null;
+
+            // Fallback: Nếu không lấy được ID, tìm lại bằng order_code
+            if (!$orderId) {
+                $findOrder = Database::fetch("SELECT id FROM orders WHERE order_code = ?", [$orderCode]);
+                $orderId = $findOrder['id'] ?? null;
+            }
+
+            if (!$orderId) throw new \Exception("Không thể lấy ID đơn hàng");
+
+            // 6. INSERT Chi Tiết Đơn Hàng
+            foreach ($buildItems as $item) {
+                $sqlItem = "INSERT INTO order_items (
+                    order_id, product_id, product_name, product_price,
+                    variant_combination, quantity, total_price, note, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, GETDATE())";
+
+                Database::query($sqlItem, [
+                    $orderId,
+                    $item['product_id'],
+                    $item['product_name'],
+                    $item['product_price'],
+                    $item['variant_combination'],
+                    $item['quantity'],
+                    $item['total_price'],
+                    $item['note']
+                ]);
+            }
+
+            return [
+                'id' => $orderId,
+                'order_code' => $orderCode,
+                'total_amount' => $totalAmount
             ];
-            $subtotal += $total;
-            $totalQuantity += $quantity;
+
+        } catch (\Exception $e) {
+            // Ghi log lỗi để debug
+            error_log("OrderService Error: " . $e->getMessage());
+            throw $e;
         }
-        $taxAmount = $taxRate > 0 ? round($subtotal * $taxRate, 2) : 0;
-        $totalAmount = $subtotal - $discountAmount + $shippingFee + $taxAmount;
-        $orderData = [
-            'user_id' => $userId,
-            'customer_name' => $customer['name'] ?? null,
-            'customer_phone' => $customer['phone'] ?? null,
-            'customer_email' => $customer['email'] ?? null,
-            'shipping_address' => $customer['shipping_address'] ?? null,
-            'item_count' => count($buildItems),
-            'quantity_total' => $totalQuantity,
-            'subtotal' => $subtotal,
-            'discount_amount' => $discountAmount,
-            'shipping_fee' => $shippingFee,
-            'tax_amount' => $taxAmount,
-            'total_amount' => $totalAmount,
-            'order_status' => 'pending',
-            'payment_status' => 'unpaid',
-            'payment_method' => $payload['payment_method'] ?? null,
-        ];
-        Order::createOrder($orderData);
-        $orderId = Database::lastInsertId();
-        OrderItem::createMultiple($orderId, $buildItems);
-        foreach ($buildItems as $item) {
-            $p = Product::find($item['product_id']);
-            if ($p && isset($p['quantity'])) {
-                $newQty = max(0, (int)$p['quantity'] - (int)$item['quantity']);
-                Product::updateQuantity($item['product_id'], $newQty);
-            }
-            Product::incrementSold($item['product_id'], (int)$item['quantity']);
-        }
-        return Order::findWithItems($orderId);
-    }
-
-    public function updateStatus($orderId, $status, $reason = null)
-    {
-        Order::updateStatus($orderId, $status, $reason);
-        return Order::findWithItems($orderId);
-    }
-
-    public function getByUser($userId, $limit = 20)
-    {
-        return Order::getByUserId($userId, $limit);
-    }
-
-    public function getByStatus($status, $limit = 50)
-    {
-        return Order::getByStatus($status, $limit);
-    }
-
-    public function statistics($startDate = null, $endDate = null)
-    {
-        return Order::getStatistics($startDate, $endDate);
     }
 }
-

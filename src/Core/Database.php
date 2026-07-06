@@ -2,105 +2,84 @@
 
 namespace Rinnsan\RinnSanWeb\Core;
 
-use PDO;
-use PDOException;
-
 class Database
 {
     private static $instance = null;
-    private $connection;
-
-    public function __construct()
-    {
-        $this->connect();
-    }
+    protected static $connection = null;
 
     public static function getInstance()
     {
         if (self::$instance === null) {
             self::$instance = new self();
         }
+        self::connect(); 
         return self::$instance;
     }
 
-    private function connect()
+    public static function connect()
     {
+        if (self::$connection) {
+            return self::$connection;
+        }
+
+        // 1. Lấy cấu hình từ .env
+        $type = $_ENV['DB_TYPE'] ?? 'mysql'; // sqlsrv hoặc mysql
         $host = $_ENV['DB_HOST'] ?? 'localhost';
         $port = $_ENV['DB_PORT'] ?? '1433';
-        $database = $_ENV['DB_DATABASE'] ?? 'RinnSanCF';
-        $username = $_ENV['DB_USERNAME'] ?? 'sa';
-        $password = $_ENV['DB_PASSWORD'] ?? '';
-        $dbType = $_ENV['DB_TYPE'] ?? 'sqlsrv'; // sqlsrv or mysql
+        $dbname = $_ENV['DB_DATABASE'] ?? 'RinnSanCF';
+        $user = $_ENV['DB_USERNAME'] ?? '';
+        $pass = $_ENV['DB_PASSWORD'] ?? '';
 
         try {
-            if ($dbType === 'sqlsrv') {
-                // SQL Server connection
-                $dsn = "sqlsrv:Server=$host,$port;Database=$database;Encrypt=no;TrustServerCertificate=yes";
-                $options = [
-                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                    PDO::SQLSRV_ATTR_ENCODING => PDO::SQLSRV_ENCODING_UTF8,
-                ];
+            // 2. Tạo chuỗi kết nối dựa trên loại Database
+            if ($type === 'sqlsrv') {
+                // --- Cấu hình cho SQL SERVER ---
+                // Format: sqlsrv:Server=localhost,1433;Database=TenDB
+                $dsn = "sqlsrv:Server={$host},{$port};Database={$dbname};TrustServerCertificate=true";
             } else {
-                // MySQL connection
-                $charset = $_ENV['DB_CHARSET'] ?? 'utf8mb4';
-                $dsn = "mysql:host=$host;port=$port;dbname=$database;charset=$charset";
-                $options = [
-                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                    PDO::ATTR_EMULATE_PREPARES => false,
-                ];
+                // --- Cấu hình cho MySQL (Dự phòng) ---
+                $dsn = "mysql:host={$host};port={$port};dbname={$dbname};charset=utf8mb4";
+            }
+            
+            // 3. Kết nối
+            $options = [
+                \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+                \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC
+            ];
+
+            // Nếu dùng MySQL thì tắt Emulate Prepares để an toàn hơn
+            if ($type === 'mysql') {
+                $options[\PDO::ATTR_EMULATE_PREPARES] = false;
             }
 
-            $this->connection = new PDO($dsn, $username, $password, $options);
-            
-        } catch (PDOException $e) {
-            throw new \Exception("Database connection failed: " . $e->getMessage() . 
-                "\nPlease check your .env file and ensure the database server is running.");
-        }
-    }
+            self::$connection = new \PDO($dsn, $user, $pass, $options);
+            return self::$connection;
 
-    public function getConnection()
-    {
-        return $this->connection;
+        } catch (\PDOException $e) {
+            // Ném lỗi ra để index.php bắt và trả về JSON
+            throw new \Exception("Lỗi kết nối Database ({$type}): " . $e->getMessage());
+        }
     }
 
     public static function query($sql, $params = [])
     {
-        $db = self::getInstance();
+        $pdo = self::connect();
         try {
-            $stmt = $db->getConnection()->prepare($sql);
+            $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
             return $stmt;
-        } catch (PDOException $e) {
-            throw new \Exception("Query execution failed: " . $e->getMessage());
+        } catch (\PDOException $e) {
+            throw new \Exception("Lỗi truy vấn SQL: " . $e->getMessage());
         }
-    }
-
-    public static function fetchAll($sql, $params = [])
-    {
-        $stmt = self::query($sql, $params);
-        return $stmt->fetchAll();
     }
 
     public static function fetch($sql, $params = [])
     {
-        $stmt = self::query($sql, $params);
-        return $stmt->fetch();
+        return self::query($sql, $params)->fetch();
     }
 
-    public static function lastInsertId()
+    public static function fetchAll($sql, $params = [])
     {
-        $db = self::getInstance();
-        $dbType = $_ENV['DB_TYPE'] ?? 'sqlsrv';
-        
-        if ($dbType === 'sqlsrv') {
-            // SQL Server uses SCOPE_IDENTITY() or OUTPUT clause
-            $stmt = $db->getConnection()->query("SELECT SCOPE_IDENTITY() as id");
-            $result = $stmt->fetch();
-            return $result['id'] ?? null;
-        } else {
-            return $db->getConnection()->lastInsertId();
-        }
+        return self::query($sql, $params)->fetchAll();
     }
 }

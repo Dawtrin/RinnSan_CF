@@ -3,106 +3,87 @@
 namespace Rinnsan\RinnSanWeb\Controllers\Api\Admin;
 
 use Rinnsan\RinnSanWeb\Controllers\Api\ApiController;
-use Rinnsan\RinnSanWeb\Models\User;
-use Rinnsan\RinnSanWeb\Models\UserAddress;
-use Rinnsan\RinnSanWeb\Models\ActivityLog;
-use Rinnsan\RinnSanWeb\Helpers\RequestHelper;
 use Rinnsan\RinnSanWeb\Core\Database;
-use Rinnsan\RinnSanWeb\Services\AdminUserService;
 
 class AdminUserController extends ApiController
 {
-    /**
-     * Tạo user mới (Admin)
-     * POST /api/admin/users
-     */
+    // 1. LẤY DANH SÁCH (FULL)
+    public function index()
+    {
+        try {
+            $sql = "SELECT id, username, full_name, email, phone, role_id, is_active, created_at 
+                    FROM users WHERE role_id IN (1, 2) ORDER BY id DESC";
+            return $this->success(Database::fetchAll($sql));
+        } catch (\Exception $e) { return $this->error($e->getMessage(), 500); }
+    }
+
+    // 2. THÊM NHÂN VIÊN MỚI
     public function store()
     {
         try {
-            $data = RequestHelper::inputSanitized();
+            $data = json_decode(file_get_contents('php://input'), true);
             
-            $required = ['username', 'email', 'password', 'full_name'];
-            foreach ($required as $field) {
-                if (!isset($data[$field])) {
-                    return $this->error("Thiếu trường bắt buộc: $field", 400);
-                }
+            if (empty($data['username']) || empty($data['password'])) {
+                return $this->error("Thiếu tên đăng nhập hoặc mật khẩu", 400);
             }
+
+            // Check trùng
+            $check = Database::fetch("SELECT id FROM users WHERE username = ?", [$data['username']]);
+            if ($check) return $this->error('Tên đăng nhập đã tồn tại', 400);
+
+            $passwordHash = password_hash($data['password'], PASSWORD_BCRYPT);
+
+            $sql = "INSERT INTO users (username, password, full_name, email, phone, role_id, is_active, created_at) 
+                    VALUES (?, ?, ?, ?, ?, ?, 1, GETDATE())";
             
-            $service = new AdminUserService();
-            $user = $service->create($data);
-            if (!$user) {
-                return $this->error('Email đã được sử dụng', 400);
-            }
-            return $this->success($user, 'Tạo user thành công', 201);
-        } catch (\Exception $e) {
-            return $this->error($e->getMessage(), 500);
-        }
+            Database::query($sql, [
+                $data['username'],
+                $passwordHash,
+                $data['full_name'] ?? '',
+                $data['email'] ?? '',
+                $data['phone'] ?? '',
+                $data['role_id'] ?? 2
+            ]);
+
+            return $this->success([], 'Tạo tài khoản thành công', 201);
+        } catch (\Exception $e) { return $this->error($e->getMessage(), 500); }
     }
 
-    /**
-     * Xóa user (Admin)
-     * DELETE /api/admin/users/{id}
-     */
+    // 3. CẬP NHẬT THÔNG TIN
+    public function update($id)
+    {
+        try {
+            $data = json_decode(file_get_contents('php://input'), true);
+            
+            $sql = "UPDATE users SET full_name = ?, email = ?, phone = ?, role_id = ? WHERE id = ?";
+            Database::query($sql, [
+                $data['full_name'], $data['email'], $data['phone'], $data['role_id'], $id
+            ]);
+
+            return $this->success([], 'Cập nhật thành công');
+        } catch (\Exception $e) { return $this->error($e->getMessage(), 500); }
+    }
+
+    // 4. ĐỔI MẬT KHẨU
+    public function resetPassword($id)
+    {
+        try {
+            $data = json_decode(file_get_contents('php://input'), true);
+            if (empty($data['password'])) return $this->error('Thiếu mật khẩu mới', 400);
+
+            $newPass = password_hash($data['password'], PASSWORD_BCRYPT);
+            Database::query("UPDATE users SET password = ? WHERE id = ?", [$newPass, $id]);
+
+            return $this->success([], 'Đổi mật khẩu thành công');
+        } catch (\Exception $e) { return $this->error($e->getMessage(), 500); }
+    }
+
+    // 5. XÓA
     public function destroy($id)
     {
         try {
-            if (session_status() === PHP_SESSION_NONE) {
-                session_start();
-            }
-            $service = new AdminUserService();
-            $result = $service->delete($id, $_SESSION['user_id'] ?? 0);
-            if ($result === null) {
-                return $this->error('User không tồn tại', 404);
-            }
-            if ($result === false) {
-                return $this->error('Không thể xóa chính mình', 400);
-            }
-            return $this->success([], 'Xóa user thành công');
-        } catch (\Exception $e) {
-            return $this->error($e->getMessage(), 500);
-        }
-    }
-
-    /**
-     * Kích hoạt/khóa user
-     * PUT /api/admin/users/{id}/activate
-     */
-    public function activate($id)
-    {
-        try {
-            $data = RequestHelper::input();
-            $isActive = isset($data['is_active']) ? (int)$data['is_active'] : 1;
-            $service = new AdminUserService();
-            $user = $service->activate($id, $isActive);
-            if (!$user) {
-                return $this->error('User không tồn tại', 404);
-            }
-            return $this->success($user, $isActive ? 'Kích hoạt user thành công' : 'Khóa user thành công');
-        } catch (\Exception $e) {
-            return $this->error($e->getMessage(), 500);
-        }
-    }
-
-    /**
-     * Thay đổi role
-     * PUT /api/admin/users/{id}/role
-     */
-    public function changeRole($id)
-    {
-        try {
-            $data = RequestHelper::input();
-            if (!isset($data['role_id'])) {
-                return $this->error('Thiếu role_id', 400);
-            }
-            $service = new AdminUserService();
-            $user = $service->changeRole($id, (int)$data['role_id']);
-            if (!$user) {
-                return $this->error('User không tồn tại', 404);
-            }
-            return $this->success($user, 'Thay đổi role thành công');
-        } catch (\Exception $e) {
-            return $this->error($e->getMessage(), 500);
-        }
+            Database::query("DELETE FROM users WHERE id = ?", [$id]);
+            return $this->success([], 'Đã xóa tài khoản');
+        } catch (\Exception $e) { return $this->error($e->getMessage(), 500); }
     }
 }
-

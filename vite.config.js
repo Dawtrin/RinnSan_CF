@@ -3,16 +3,17 @@ import { resolve } from 'path'
 
 export default {
   plugins: [react()],
-  
-  // QUAN TRỌNG: Chỉ định root directory
+
+  envDir: resolve(__dirname),
   root: resolve(__dirname, 'resources'),
-  
+  // Copy ảnh/video từ public/ vào dist khi build (FE-only deploy)
+  publicDir: resolve(__dirname, 'public'),
+
   build: {
-    outDir: '../public/dist',  // ← Ra ngoài resources
+    outDir: resolve(__dirname, 'dist'),
     emptyOutDir: true,
-    manifest: true,
     rollupOptions: {
-      input: resolve(__dirname, 'resources/src/main.jsx'), // ← Full path
+      input: resolve(__dirname, 'resources/index.html'),
     },
   },
   
@@ -25,7 +26,19 @@ export default {
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
-      }
+      },
+      '/images': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/videos': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/dist': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
     }
   }
 }

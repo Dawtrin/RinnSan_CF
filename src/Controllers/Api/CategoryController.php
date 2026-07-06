@@ -2,17 +2,67 @@
 
 namespace Rinnsan\RinnSanWeb\Controllers\Api;
 
-use Rinnsan\RinnSanWeb\Models\Category;
-use Rinnsan\RinnSanWeb\Models\Product;
-use Rinnsan\RinnSanWeb\Core\Database;
 use Rinnsan\RinnSanWeb\Services\CategoryService;
+use Rinnsan\RinnSanWeb\Core\Database;
 
 class CategoryController extends ApiController
 {
     /**
-     * Lấy danh sách danh mục
-     * GET /api/categories
+     * API Lấy Full Menu (Mapping dữ liệu khớp với MenuPage.jsx)
+     * GET /api/menu
      */
+    public function menu()
+    {
+        try {
+            // 1. Lấy danh mục hoạt động
+            $sqlCat = "SELECT * FROM categories WHERE is_active = 1 ORDER BY sort_order ASC";
+            $categories = Database::fetchAll($sqlCat);
+            
+            $result = [];
+
+            // 2. Lặp qua từng danh mục để lấy sản phẩm
+            foreach ($categories as $cat) {
+                // Lấy sản phẩm của danh mục đó
+                $sqlProd = "SELECT * FROM products WHERE category_id = ? AND is_active = 1 ORDER BY created_at DESC";
+                $products = Database::fetchAll($sqlProd, [$cat['id']]);
+
+                // Map dữ liệu sản phẩm sang chuẩn MenuPage.jsx (PascalCase)
+                $items = [];
+                foreach ($products as $prod) {
+                    // Xử lý ảnh JSON
+                    $imageUrl = null;
+                    if (!empty($prod['images'])) {
+                        $decoded = json_decode($prod['images'], true);
+                        $imageUrl = (is_array($decoded) && count($decoded) > 0) ? $decoded[0] : $prod['images'];
+                    }
+
+                    $items[] = [
+                        'ProductID'   => $prod['id'],
+                        'ProductName' => $prod['name'],
+                        'Price'       => $prod['price'],
+                        'MainImage'   => $imageUrl,
+                        'ShortDesc'   => $prod['short_description'],
+                        'BadgeTag'    => ($prod['is_featured'] == 1) ? 'BEST SELLER' : null,
+                    ];
+                }
+
+                // Map dữ liệu danh mục
+                $result[] = [
+                    'CategoryID'   => $cat['id'],
+                    'CategoryName' => $cat['name'],
+                    'CategorySlug' => $cat['slug'],
+                    'ImageHeader'  => $cat['image'], // Ảnh banner danh mục
+                    'items'        => $items
+                ];
+            }
+
+            return $this->success($result, 'Lấy thực đơn thành công');
+        } catch (\Exception $e) {
+            return $this->error($e->getMessage(), 500);
+        }
+    }
+
+    // --- CÁC HÀM KHÁC GIỮ NGUYÊN ---
     public function index()
     {
         try {
@@ -20,96 +70,48 @@ class CategoryController extends ApiController
             $parentOnly = isset($_GET['parent_only']) && $_GET['parent_only'] == '1';
             $service = new CategoryService();
             $categories = $service->list($withCount, $parentOnly);
-            return $this->success($categories, 'Lấy danh sách danh mục thành công');
-        } catch (\Exception $e) {
-            return $this->error($e->getMessage(), 500);
-        }
+            return $this->success($categories);
+        } catch (\Exception $e) { return $this->error($e->getMessage(), 500); }
     }
 
-    /**
-     * Lấy chi tiết danh mục
-     * GET /api/categories/{id}
-     */
     public function show($id)
     {
         try {
             $service = new CategoryService();
             $category = $service->get($id);
-            if (!$category) {
-                return $this->error('Danh mục không tồn tại', 404);
-            }
-            return $this->success($category, 'Lấy chi tiết danh mục thành công');
-        } catch (\Exception $e) {
-            return $this->error($e->getMessage(), 500);
-        }
+            if (!$category) return $this->error('Danh mục không tồn tại', 404);
+            return $this->success($category);
+        } catch (\Exception $e) { return $this->error($e->getMessage(), 500); }
     }
 
-    /**
-     * Lấy danh mục theo slug
-     * GET /api/categories/slug/{slug}
-     */
     public function showBySlug($slug)
     {
         try {
             $service = new CategoryService();
             $category = $service->getBySlug($slug);
-            if (!$category) {
-                return $this->error('Danh mục không tồn tại', 404);
-            }
-            return $this->success($category, 'Lấy danh mục thành công');
-        } catch (\Exception $e) {
-            return $this->error($e->getMessage(), 500);
-        }
+            if (!$category) return $this->error('Danh mục không tồn tại', 404);
+            return $this->success($category);
+        } catch (\Exception $e) { return $this->error($e->getMessage(), 500); }
     }
 
-    /**
-     * Tạo danh mục mới
-     * POST /api/categories
-     */
     public function store()
     {
         try {
             $data = json_decode(file_get_contents('php://input'), true);
-            
-            if (!$data) {
-                return $this->error('Dữ liệu không hợp lệ', 400);
-            }
-            
-            $required = ['name', 'slug'];
-            foreach ($required as $field) {
-                if (!isset($data[$field])) {
-                    return $this->error("Thiếu trường bắt buộc: $field", 400);
-                }
-            }
-            
             $service = new CategoryService();
             $category = $service->create($data);
             return $this->success($category, 'Tạo danh mục thành công', 201);
-        } catch (\Exception $e) {
-            return $this->error($e->getMessage(), 500);
-        }
+        } catch (\Exception $e) { return $this->error($e->getMessage(), 500); }
     }
 
-    /**
-     * Cập nhật danh mục
-     * PUT /api/categories/{id}
-     */
     public function update($id)
     {
         try {
             $data = json_decode(file_get_contents('php://input'), true);
-            if (!$data) {
-                return $this->error('Dữ liệu không hợp lệ', 400);
-            }
             $service = new CategoryService();
             $category = $service->update($id, $data);
-            if (!$category) {
-                return $this->error('Danh mục không tồn tại', 404);
-            }
+            if (!$category) return $this->error('Danh mục không tồn tại', 404);
             return $this->success($category, 'Cập nhật danh mục thành công');
-        } catch (\Exception $e) {
-            return $this->error($e->getMessage(), 500);
-        }
+        } catch (\Exception $e) { return $this->error($e->getMessage(), 500); }
     }
 }
-

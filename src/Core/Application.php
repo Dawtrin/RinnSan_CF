@@ -73,6 +73,27 @@ class Application
 
     public function run(): void
     {
+        // --- [FIX QUAN TRỌNG: XỬ LÝ CORS CHO PHÉP ĐĂNG NHẬP & LOAD API] ---
+        // 1. Tự động phát hiện và cho phép React (localhost:5173) kết nối
+        if (isset($_SERVER['HTTP_ORIGIN'])) {
+            header("Access-Control-Allow-Origin: {$_SERVER['HTTP_ORIGIN']}");
+            header('Access-Control-Allow-Credentials: true');
+            header('Access-Control-Max-Age: 86400');    // cache for 1 day
+        }
+
+        // 2. Xử lý request OPTIONS (Preflight)
+        // Đây là bước quan trọng nhất để trình duyệt không chặn API Login/Menu
+        if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
+            if (isset($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_METHOD']))
+                header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");         
+
+            if (isset($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS']))
+                header("Access-Control-Allow-Headers: {$_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS']}");
+
+            exit(0); // Dừng ngay, trả về OK để trình duyệt đi tiếp
+        }
+        // --- [HẾT PHẦN FIX] ---
+
         try {
             $this->router->dispatch();
         } catch (\Exception $e) {
@@ -95,8 +116,8 @@ class Application
         $debug = $_ENV['APP_DEBUG'] ?? false;
         $isApiRequest = strpos($_SERVER['REQUEST_URI'] ?? '', '/api/') !== false;
         
-        // Set CORS headers for API
-        if ($isApiRequest) {
+        // Set CORS headers for API (Backup)
+        if ($isApiRequest && class_exists('\Rinnsan\RinnSanWeb\Helpers\ResponseHelper')) {
             \Rinnsan\RinnSanWeb\Helpers\ResponseHelper::cors();
         }
         

@@ -1,64 +1,39 @@
-# 🌟 RinnSan Web - Dự Án Web Siêu Định Cao
+# 🌟 RinnSan Web - Dự Án Web Cafe & Bakery
 
-Một dự án web hiện đại kết hợp **PHP backend** với **React frontend**, sử dụng các công nghệ tiên tiến nhất.
+Một dự án web hiện đại kết hợp **PHP Backend (MVC)** với **React Frontend**, sử dụng cơ sở dữ liệu **SQL Server**. Hệ thống tích hợp các tính năng tự động hóa quy trình đặt hàng F&B.
 
 ## 🛠️ Công Nghệ Sử Dụng
 
 ### Frontend
-- **React 18** - Library xây dựng UI
-- **Vite** - Build tool nhanh
-- **Tailwind CSS & Bootstrap** - Styling
-- **Framer Motion & GSAP** - Animation
-- **React Three Fiber** - 3D Graphics
-- **TensorFlow.js & Face API** - AI/ML
+- **React 18** - Thư viện xây dựng UI
+- **Vite** - Build tool tốc độ cao
+- **Tailwind CSS & Bootstrap** - Styling giao diện
+- **Axios** - Xử lý HTTP Requests
 
 ### Backend
-- **PHP** - Ngôn ngữ lập trình
-- **Custom Router** - Định tuyến tùy chỉnh
-- **MySQL** - Database
-- **Composer** - Package manager
+- **PHP 8.x** - Ngôn ngữ phía server
+- **SQL Server** - Hệ quản trị cơ sở dữ liệu (Thay vì MySQL)
+- **MVC Pattern** - Mô hình kiến trúc phần mềm
+- **Custom Router** - Hệ thống định tuyến tùy chỉnh
 
-## 📋 Cấu Trúc Dự Án
+## ✨ Tính Năng Nổi Bật (Mới Cập Nhật)
 
-```
-RinnSan_Web/
-├── public/                 # Public assets
-│   ├── index.php          # Entry point
-│   ├── css/               # Stylesheets
-│   └── js/                # JavaScript files
-├── src/                   # Source code
-│   ├── Controllers/       # Request handlers
-│   ├── Models/            # Database models
-│   ├── Views/             # View templates
-│   ├── Core/              # Core classes (Router, Database)
-│   ├── Helpers/           # Helper functions
-│   ├── Middleware/        # Middleware classes
-│   ├── Services/          # Business logic
-│   └── Validation/        # Validation rules
-├── resources/
-│   ├── js/                # React components
-│   └── css/               # Global styles
-├── database/
-│   ├── migrations/        # Database migrations
-│   └── seeders/           # Database seeders
-├── config/                # Configuration files
-├── routes/                # Route definitions
-├── test/                  # Test files
-├── composer.json          # PHP dependencies
-├── package.json           # Node.js dependencies
-├── vite.config.js         # Vite configuration
-└── tailwind.config.js     # Tailwind configuration
-```
+1.  **Silent Register (Đăng ký ngầm):** Khách hàng chỉ cần nhập SĐT khi đặt hàng, hệ thống tự động tạo tài khoản và tích hợp vào đơn hàng.
+2.  **Loyalty Points (Tích điểm):** Tự động quy đổi doanh thu thành điểm thưởng (10.000đ = 1 điểm) khi đơn hàng hoàn thành.
+3.  **Smart Payment Status:** Tự động cập nhật trạng thái "Đã thanh toán" khi Admin xác nhận giao hàng (đối với Chuyển khoản) hoặc Hoàn thành đơn (đối với Tiền mặt).
+4.  **Voucher System:** Áp dụng mã giảm giá và tự động đếm số lần sử dụng.
 
-## 🚀 Cách Chạy Dự Án
+
+
+## 🚀 Hướng Dẫn Cài Đặt & Chạy
 
 ### 1. Cài Đặt Dependencies
 
 ```bash
-# Install PHP dependencies
+# Cài đặt thư viện PHP
 composer install
 
-# Install Node.js dependencies
+# Cài đặt thư viện Node.js (Frontend)
 npm install
 ```
 
@@ -67,13 +42,29 @@ npm install
 Sửa file `.env`:
 
 ```env
+# Application
+APP_NAME=RINNSAN_WEB
 APP_ENV=local
 APP_DEBUG=true
+APP_URL=http://localhost:8000
+APP_TIMEZONE=Asia/Ho_Chi_Minh
+
+# Database - SQL SERVER
+DB_TYPE=sqlsrv
 DB_HOST=localhost
-DB_PORT=3306
-DB_DATABASE=rinnsan_web
-DB_USERNAME=root
+DB_PORT=1433
+DB_DATABASE=RinnSanCF
+DB_USERNAME=
 DB_PASSWORD=
+DB_CHARSET=utf8mb4
+DB_TRUSTED_CONNECTION=yes
+
+# Session
+SESSION_DRIVER=file
+SESSION_LIFETIME=120
+
+# Security
+ENCRYPTION_KEY=your-secret-key-here
 ```
 
 ### 3. Chạy Dự Án
@@ -101,114 +92,7 @@ npm run dev
 - **Frontend (React):** http://localhost:5173
 - **Backend (PHP):** http://localhost:8000
 
-## 📚 Hướng Dẫn Sử Dụng
 
-### Tạo Route
-
-Thêm route trong `routes/web.php`:
-
-```php
-$router->get('/hello', [HelloController::class, 'index']);
-$router->post('/submit', [HelloController::class, 'store']);
-```
-
-### Tạo Controller
-
-Tạo file `src/Controllers/Web/HelloController.php`:
-
-```php
-<?php
-namespace Rinnsan\RinnSanWeb\Controllers\Web;
-
-class HelloController
-{
-    public function index($params = [])
-    {
-        return $this->render('hello', ['name' => 'World']);
-    }
-}
-```
-
-### Tạo Model
-
-Tạo file `src/Models/User.php`:
-
-```php
-<?php
-namespace Rinnsan\RinnSanWeb\Models;
-
-class User extends Model
-{
-    protected $table = 'users';
-}
-```
-
-### Sử Dụng Database
-
-```php
-// Get all
-$users = User::all();
-
-// Find by ID
-$user = User::find(1);
-
-// Where condition
-$admin_users = User::where('role', '=', 'admin');
-
-// Create
-User::create(['name' => 'John', 'email' => 'john@example.com']);
-
-// Update
-User::update(1, ['name' => 'Jane']);
-
-// Delete
-User::delete(1);
-```
-
-### Sử Dụng Validation
-
-```php
-$validator = new Validator();
-
-$rules = [
-    'name' => 'required|min:3|max:255',
-    'email' => 'required|email',
-];
-
-if ($validator->validate($_POST, $rules)) {
-    // Valid
-} else {
-    $errors = $validator->getErrors();
-}
-```
-
-### Sử Dụng Helpers
-
-```php
-// Get environment variable
-$debug = Helper::env('APP_DEBUG', false);
-
-// Redirect
-Helper::redirect('/dashboard');
-
-// Escape HTML
-$safe = Helper::escape($user_input);
-
-// Generate URL
-$url = Helper::url('/users/1');
-
-// Debug (dump and die)
-Helper::dd($data);
-```
-
-## 🔧 Build Cho Production
-
-```bash
-# Build frontend
-npm run build
-
-# Output sẽ ở trong public/dist/
-```
 
 ## 📝 Linting & Testing
 
@@ -220,7 +104,6 @@ php -m test/
 npm run lint
 ```
 
-## 🐛 Troubleshooting
 
 ### Port đã được sử dụng
 
@@ -229,11 +112,16 @@ npm run lint
 php -S localhost:8001 -t public
 ```
 
-### Database connection error
 
-- Kiểm tra MySQL server có chạy không
-- Kiểm tra `.env` file cấu hình đúng
-- Kiểm tra tên database, username, password
+### 📝 API Endpoints Chính
+POST /api/orders: Tạo đơn hàng (Kèm logic tự tạo tài khoản & trừ kho).
+
+PUT /api/orders/{id}/status: Cập nhật trạng thái đơn & Thanh toán tự động.
+
+GET /api/products: Lấy danh sách sản phẩm.
+
+GET /api/products/best-sellers: Lấy sản phẩm bán chạy (Top 6).
+
 
 ### Dependencies không được cài
 
@@ -258,7 +146,8 @@ MIT License - see LICENSE file for details
 
 ## 👨‍💻 Author
 
-RinnSan Web Team
+RinnSan Vat_Trn
+
 
 ---
 

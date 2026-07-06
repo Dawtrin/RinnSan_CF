@@ -75,23 +75,26 @@ class ResponseHelper
      */
     public static function cors($allowedOrigins = null)
     {
-        // Default: allow all origins (development)
+        // List các domain frontend được phép
         if ($allowedOrigins === null) {
-            $allowedOrigins = ['*'];
+            $allowedOrigins = [
+                'http://localhost:5173',
+                'http://localhost:5174',
+                'http://localhost:5175',
+                'http://localhost:5176'
+            ];
         }
         
-        $origin = $_SERVER['HTTP_ORIGIN'] ?? '*';
+        $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
         
-        // Allow all origins
-        if (in_array('*', $allowedOrigins)) {
-            header('Access-Control-Allow-Origin: *');
-        } elseif (in_array($origin, $allowedOrigins)) {
+        // Logic check chính xác origin thay vì dùng *
+        if (in_array($origin, $allowedOrigins)) {
             header("Access-Control-Allow-Origin: {$origin}");
+            header('Access-Control-Allow-Credentials: true');
         }
         
         header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS, PATCH');
         header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, Accept, Origin');
-        header('Access-Control-Allow-Credentials: true');
         header('Access-Control-Max-Age: 86400');
         
         // Handle preflight request

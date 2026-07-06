@@ -13,12 +13,14 @@ use Rinnsan\RinnSanWeb\Controllers\Api\SettingsController;
 use Rinnsan\RinnSanWeb\Controllers\Api\AdminController;
 use Rinnsan\RinnSanWeb\Controllers\Api\InventoryController;
 use Rinnsan\RinnSanWeb\Controllers\Api\UserController;
+    
 use Rinnsan\RinnSanWeb\Controllers\Api\Admin\AdminUserController;
 use Rinnsan\RinnSanWeb\Controllers\Api\Admin\AdminCouponController;
 use Rinnsan\RinnSanWeb\Controllers\Api\Admin\AdminSupplierController;
 use Rinnsan\RinnSanWeb\Controllers\Api\Admin\AdminRoleController;
 use Rinnsan\RinnSanWeb\Controllers\Api\Admin\AdminActivityLogController;
 use Rinnsan\RinnSanWeb\Controllers\Api\Admin\AdminBulkController;
+use Rinnsan\RinnSanWeb\Controllers\Api\Admin\AdminCustomerController;
 
 // Status & Health
 $router->get('/api/status', [StatusController::class, 'status']);
@@ -33,6 +35,7 @@ $router->post('/api/auth/logout', [AuthController::class, 'logout']);
 
 // Product Routes
 $router->get('/api/products', [ProductController::class, 'index']);
+$router->get('/api/products/best-sellers', [ProductController::class, 'getBestSellers']);
 $router->get('/api/products/{id}', [ProductController::class, 'show']);
 $router->get('/api/products/{id}/variants', [ProductController::class, 'variants']);
 $router->get('/api/products/{id}/options', [ProductController::class, 'options']);
@@ -40,7 +43,8 @@ $router->post('/api/products', [ProductController::class, 'store']);
 $router->put('/api/products/{id}', [ProductController::class, 'update']);
 $router->delete('/api/products/{id}', [ProductController::class, 'destroy']);
 
-// Category Routes
+/// Category Routes
+$router->get('/api/menu', [CategoryController::class, 'menu']); // <--- [THÊM DÒNG NÀY]
 $router->get('/api/categories', [CategoryController::class, 'index']);
 $router->get('/api/categories/{id}', [CategoryController::class, 'show']);
 $router->get('/api/categories/slug/{slug}', [CategoryController::class, 'showBySlug']);
@@ -109,12 +113,14 @@ $router->get('/api/admin/orders/recent', [AdminController::class, 'recentOrders'
 $router->get('/api/admin/products/top-selling', [AdminController::class, 'topSellingProducts']);
 
 // Admin User Management
+$router->get('/api/admin/users', [AdminUserController::class, 'index']);
 $router->post('/api/admin/users', [AdminUserController::class, 'store']);
 $router->delete('/api/admin/users/{id}', [AdminUserController::class, 'destroy']);
 $router->put('/api/admin/users/{id}/activate', [AdminUserController::class, 'activate']);
 $router->put('/api/admin/users/{id}/role', [AdminUserController::class, 'changeRole']);
 
 // Admin Coupon Management
+$router->get('/api/admin/coupons', [AdminCouponController::class, 'index']);
 $router->post('/api/admin/coupons', [AdminCouponController::class, 'store']);
 $router->put('/api/admin/coupons/{id}', [AdminCouponController::class, 'update']);
 $router->delete('/api/admin/coupons/{id}', [AdminCouponController::class, 'destroy']);
@@ -140,4 +146,8 @@ $router->delete('/api/admin/activity-logs', [AdminActivityLogController::class, 
 $router->post('/api/admin/bulk/delete', [AdminBulkController::class, 'delete']);
 $router->post('/api/admin/bulk/update', [AdminBulkController::class, 'update']);
 $router->post('/api/admin/bulk/activate', [AdminBulkController::class, 'activate']);
+
+// Admin Customer Management
+$router->get('/api/admin/customers', [AdminCustomerController::class, 'index']);
+$router->put('/api/admin/customers/{id}/points', [AdminCustomerController::class, 'updatePoints']);
 

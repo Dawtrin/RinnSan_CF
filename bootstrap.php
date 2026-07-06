@@ -37,7 +37,7 @@ if (file_exists($envFile)) {
     }
 }
 
-echo "<!-- Bootstrap loaded successfully -->";
+
 // Load helpers required by Application
 $helperFiles = [
     '/src/Helpers/ResponseHelper.php'

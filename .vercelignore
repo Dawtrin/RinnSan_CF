@@ -1,0 +1,11 @@
+.env
+.env.*
+logs/
+storage/cache/
+node_modules/
+.vscode/
+.idea/
+*.log
+simple_test.php
+public/test_login.php
+public/fix_password.php

@@ -14,7 +14,7 @@ class Coupon extends Model
     ];
 
     /**
-     * Tìm coupon theo mã
+     * Tìm coupon active (Dùng cho Khách hàng mua sắm)
      */
     public static function findByCode($code)
     {
@@ -23,8 +23,27 @@ class Coupon extends Model
     }
 
     /**
-     * Kiểm tra coupon có hợp lệ không
+     * [MỚI] Kiểm tra mã tồn tại (Dùng cho Admin khi tạo mới)
+     * Kiểm tra tất cả, kể cả mã đang ẩn hoặc hết hạn
      */
+    public static function checkCodeExists($code)
+    {
+        $sql = "SELECT COUNT(*) as count FROM coupons WHERE code = ?";
+        $result = Database::fetch($sql, [$code]);
+        return ($result['count'] > 0);
+    }
+
+    /**
+     * [MỚI] Lấy tất cả coupon (Dùng cho Admin)
+     */
+    public static function getAll()
+    {
+        // Lấy tất cả, sắp xếp mới nhất lên đầu
+        $sql = "SELECT * FROM coupons ORDER BY id DESC";
+        return Database::fetchAll($sql);
+    }
+
+    // --- CÁC HÀM CŨ GIỮ NGUYÊN (Validate, Calculate...) ---
     public static function validateCoupon($code, $orderAmount = 0)
     {
         $coupon = self::findByCode($code);
@@ -43,8 +62,7 @@ class Coupon extends Model
             return ['valid' => false, 'message' => 'Mã giảm giá đã hết hạn'];
         }
         
-        // Kiểm tra số lần sử dụng
-        if ($coupon['usage_limit'] && $coupon['used_count'] >= $coupon['usage_limit']) {
+        if ($coupon['usage_limit'] > 0 && $coupon['used_count'] >= $coupon['usage_limit']) {
             return ['valid' => false, 'message' => 'Mã giảm giá đã hết lượt sử dụng'];
         }
         
@@ -75,21 +93,9 @@ class Coupon extends Model
             $discount = $coupon['max_discount_amount'];
         }
         
-        return min($discount, $orderAmount); // Không giảm quá tổng đơn hàng
+        return min($discount, $orderAmount);
     }
 
-    /**
-     * Tăng số lần sử dụng
-     */
-    public static function incrementUsage($id)
-    {
-        $sql = "UPDATE coupons SET used_count = used_count + 1 WHERE id = ?";
-        return Database::query($sql, [$id]);
-    }
-
-    /**
-     * Lấy tất cả coupon active
-     */
     public static function getAllActive()
     {
         $now = date('Y-m-d H:i:s');

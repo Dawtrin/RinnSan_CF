@@ -15,6 +15,47 @@ class Product extends Model
     ];
 
     /**
+     * TÌM SẢN PHẨM THEO ID - PHƯƠNG THỨC QUAN TRỌNG
+     */
+    public static function find($id)
+    {
+        try {
+            $sql = "SELECT * FROM products WHERE id = ?";
+            $result = Database::fetch($sql, [$id]);
+            
+            if ($result) {
+                error_log("Product::find - Found product ID: {$id}, name: " . ($result['name'] ?? 'N/A'));
+            } else {
+                error_log("Product::find - Product not found with ID: {$id}");
+            }
+            
+            return $result;
+        } catch (\Exception $e) {
+            error_log("Product::find error for ID {$id}: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Lấy tất cả sản phẩm
+     */
+    public static function all($activeOnly = false)
+    {
+        try {
+            $sql = "SELECT * FROM products";
+            if ($activeOnly) {
+                $sql .= " WHERE is_active = 1";
+            }
+            $sql .= " ORDER BY created_at DESC";
+            
+            return Database::fetchAll($sql);
+        } catch (\Exception $e) {
+            error_log("Product::all error: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
      * Lấy sản phẩm theo danh mục
      */
     public static function getByCategory($categoryId, $activeOnly = true)
@@ -40,7 +81,7 @@ class Product extends Model
                 ORDER BY created_at DESC";
         
         if ($limit > 0) {
-            $sql .= " OFFSET 0 ROWS FETCH NEXT $limit ROWS ONLY";
+            $sql .= " LIMIT $limit";
         }
         
         return Database::fetchAll($sql);
@@ -53,7 +94,7 @@ class Product extends Model
     {
         $sql = "SELECT * FROM products WHERE is_active = 1 
                 ORDER BY created_at DESC 
-                OFFSET 0 ROWS FETCH NEXT $limit ROWS ONLY";
+                LIMIT $limit";
         
         return Database::fetchAll($sql);
     }
@@ -67,7 +108,7 @@ class Product extends Model
                 WHERE (name LIKE ? OR description LIKE ? OR tags LIKE ?) 
                 AND is_active = 1
                 ORDER BY created_at DESC
-                OFFSET 0 ROWS FETCH NEXT $limit ROWS ONLY";
+                LIMIT $limit";
         
         $searchTerm = "%$keyword%";
         return Database::fetchAll($sql, [$searchTerm, $searchTerm, $searchTerm]);
@@ -109,7 +150,7 @@ class Product extends Model
      */
     public static function updateQuantity($id, $quantity)
     {
-        $sql = "UPDATE products SET quantity = ?, updated_at = GETDATE() WHERE id = ?";
+        $sql = "UPDATE products SET quantity = ?, updated_at = NOW() WHERE id = ?";
         return Database::query($sql, [$quantity, $id]);
     }
 
@@ -118,8 +159,7 @@ class Product extends Model
      */
     public static function incrementSold($id, $quantity = 1)
     {
-        $sql = "UPDATE products SET sold_count = sold_count + ?, updated_at = GETDATE() WHERE id = ?";
+        $sql = "UPDATE products SET sold_count = sold_count + ?, updated_at = NOW() WHERE id = ?";
         return Database::query($sql, [$quantity, $id]);
     }
 }
-

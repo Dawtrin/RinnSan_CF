@@ -53,5 +53,30 @@ class CategoryService extends Service
         Category::update($id, $data);
         return Category::find($id);
     }
-}
 
+    /**
+     * [MỚI] Lấy Full Menu và xử lý JSON từ SQL Server
+     */
+    public function getFullMenu()
+    {
+        // 1. Gọi xuống Model để chạy EXEC GetFullMenu
+        $rawResult = Category::getMenuFromProc();
+
+        if (empty($rawResult)) {
+            return [];
+        }
+
+        // 2. Xử lý kết quả từ SQL Server FOR JSON
+        // SQL Server có thể trả về chuỗi JSON bị chia thành nhiều dòng nếu quá dài
+        $jsonString = '';
+        foreach ($rawResult as $row) {
+            // Lấy giá trị của cột đầu tiên (thường không có tên hoặc tên ngẫu nhiên)
+            $jsonString .= reset($row);
+        }
+
+        // 3. Chuyển đổi chuỗi JSON thành Mảng PHP
+        $menuData = json_decode($jsonString, true);
+
+        return $menuData ?: [];
+    }
+}

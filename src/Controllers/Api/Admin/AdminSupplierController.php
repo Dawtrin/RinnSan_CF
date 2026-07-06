@@ -3,100 +3,96 @@
 namespace Rinnsan\RinnSanWeb\Controllers\Api\Admin;
 
 use Rinnsan\RinnSanWeb\Controllers\Api\ApiController;
-use Rinnsan\RinnSanWeb\Models\Supplier;
-use Rinnsan\RinnSanWeb\Helpers\RequestHelper;
 use Rinnsan\RinnSanWeb\Core\Database;
-use Rinnsan\RinnSanWeb\Services\AdminSupplierService;
 
 class AdminSupplierController extends ApiController
 {
     /**
-     * Lấy danh sách suppliers
-     * GET /api/admin/suppliers
+     * Lấy danh sách NCC
      */
-    public function index()
-    {
+    public function index() {
         try {
-            $pagination = RequestHelper::getPaginationParams();
-            $filters = RequestHelper::getFilters(['is_active']);
-            $sort = RequestHelper::getSortParams('name', 'ASC');
-            $service = new AdminSupplierService();
-            $result = $service->paginate($pagination['page'], $pagination['per_page'], $filters, $sort);
-            
-            return $this->success($result['data'], 'Lấy danh sách suppliers thành công', 200, [
-                'pagination' => $result['pagination']
-            ]);
-        } catch (\Exception $e) {
-            return $this->error($e->getMessage(), 500);
+            // Sắp xếp mới nhất lên đầu
+            $suppliers = Database::fetchAll("SELECT * FROM suppliers ORDER BY id DESC");
+            return $this->success($suppliers);
+        } catch (\Exception $e) { 
+            return $this->error($e->getMessage(), 500); 
         }
     }
 
     /**
-     * Tạo supplier mới
-     * POST /api/admin/suppliers
+     * Tạo NCC mới
      */
-    public function store()
-    {
+    public function store() {
         try {
-            $data = RequestHelper::inputSanitized();
+            $data = json_decode(file_get_contents('php://input'), true);
+            if (empty($data['name'])) return $this->error('Tên NCC là bắt buộc', 400);
             
-            if (!isset($data['name'])) {
-                return $this->error('Thiếu trường name', 400);
-            }
-            $service = new AdminSupplierService();
-            if (session_status() === PHP_SESSION_NONE) {
-                session_start();
-            }
-            $supplier = $service->create($data, $_SESSION['user_id'] ?? null);
+            if (isset($data['id'])) unset($data['id']);
             
-            return $this->success($supplier, 'Tạo supplier thành công', 201);
-        } catch (\Exception $e) {
-            return $this->error($e->getMessage(), 500);
+            // Lọc trường an toàn
+            $allowFields = ['name', 'contact_person', 'phone', 'email', 'address', 'is_active'];
+            $insertData = array_intersect_key($data, array_flip($allowFields));
+
+            $columns = implode(", ", array_keys($insertData));
+            $placeholders = implode(", ", array_fill(0, count($insertData), "?"));
+            $values = array_values($insertData);
+            
+            $sql = "INSERT INTO suppliers ($columns) VALUES ($placeholders)";
+            Database::query($sql, $values);
+
+            return $this->success([], 'Tạo nhà cung cấp thành công', 201);
+
+        } catch (\Exception $e) { 
+            return $this->error("Lỗi tạo NCC: " . $e->getMessage(), 500); 
         }
     }
 
     /**
-     * Cập nhật supplier
-     * PUT /api/admin/suppliers/{id}
+     * Cập nhật NCC
      */
-    public function update($id)
-    {
+    public function update($id) {
         try {
-            $data = RequestHelper::inputSanitized();
-            $service = new AdminSupplierService();
-            if (session_status() === PHP_SESSION_NONE) {
-                session_start();
+            $data = json_decode(file_get_contents('php://input'), true);
+            if (isset($data['id'])) unset($data['id']);
+
+            $exists = Database::fetch("SELECT id FROM suppliers WHERE id = ?", [$id]);
+            if (!$exists) return $this->error('NCC không tồn tại', 404);
+
+            $allowFields = ['name', 'contact_person', 'phone', 'email', 'address', 'is_active'];
+            $updateData = array_intersect_key($data, array_flip($allowFields));
+
+            $sets = [];
+            $values = [];
+            foreach ($updateData as $key => $val) {
+                $sets[] = "$key = ?";
+                $values[] = $val;
             }
-            $supplier = $service->update($id, $data, $_SESSION['user_id'] ?? null);
-            if (!$supplier) {
-                return $this->error('Supplier không tồn tại', 404);
-            }
-            
-            return $this->success($supplier, 'Cập nhật supplier thành công');
-        } catch (\Exception $e) {
-            return $this->error($e->getMessage(), 500);
+            $values[] = $id;
+
+            $sql = "UPDATE suppliers SET " . implode(", ", $sets) . " WHERE id = ?";
+            Database::query($sql, $values);
+
+            return $this->success([], 'Cập nhật NCC thành công');
+
+        } catch (\Exception $e) { 
+            return $this->error($e->getMessage(), 500); 
         }
     }
 
     /**
-     * Xóa supplier
-     * DELETE /api/admin/suppliers/{id}
+     * Xóa NCC
      */
-    public function destroy($id)
-    {
+    public function destroy($id) {
         try {
-            $service = new AdminSupplierService();
-            if (session_status() === PHP_SESSION_NONE) {
-                session_start();
-            }
-            $deleted = $service->delete($id, $_SESSION['user_id'] ?? null);
-            if ($deleted === null) {
-                return $this->error('Supplier không tồn tại', 404);
-            }
-            return $this->success([], 'Xóa supplier thành công');
-        } catch (\Exception $e) {
-            return $this->error($e->getMessage(), 500);
+            // Kiểm tra xem NCC có đang cung cấp nguyên liệu trong kho không (tùy chọn)
+            // $hasInventory = Database::fetch("SELECT id FROM inventory WHERE supplier_id = ?", [$id]);
+            // if ($hasInventory) return $this->error('Không thể xóa NCC đang có hàng trong kho', 400);
+
+            Database::query("DELETE FROM suppliers WHERE id = ?", [$id]);
+            return $this->success([], 'Xóa NCC thành công');
+        } catch (\Exception $e) { 
+            return $this->error($e->getMessage(), 500); 
         }
     }
 }
-

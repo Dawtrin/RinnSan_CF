@@ -3,6 +3,8 @@
 namespace Rinnsan\RinnSanWeb\Services;
 
 use Rinnsan\RinnSanWeb\Models\Product;
+use Rinnsan\RinnSanWeb\Models\ProductVariant;
+use Rinnsan\RinnSanWeb\Models\ProductOption;
 use Rinnsan\RinnSanWeb\Core\Database;
 use Rinnsan\RinnSanWeb\Helpers\CacheHelper;
 
@@ -16,46 +18,41 @@ class ProductService extends Service
         $search = $params['search'] ?? null;
         $featured = $params['featured'] ?? false;
         $categoryId = $params['category_id'] ?? null;
-        $cacheKey = 'products_' . md5(json_encode([$pagination, $filters, $sort, $search, $featured, $categoryId]));
-        $products = CacheHelper::remember($cacheKey, function() use ($pagination, $filters, $sort, $search, $featured, $categoryId) {
-            if ($search) {
-                return Product::search($search, $pagination['per_page']);
-            }
-            if ($featured) {
-                return Product::getFeatured($pagination['per_page']);
-            }
-            if ($categoryId) {
-                return Product::getByCategory($categoryId);
-            }
+        
+        // [FIX LỖI UPDATE CHẬM]
+        // Bỏ CacheHelper để dữ liệu luôn mới nhất khi Admin thao tác
+        if ($search) return Product::search($search, $pagination['per_page']);
+        if ($featured) return Product::getFeatured($pagination['per_page']);
+        if ($categoryId) return Product::getByCategory($categoryId);
+        
             return Product::paginate($pagination['page'], $pagination['per_page'], $filters, $sort['sort'] . ' ' . $sort['order']);
         }, 300);
         return $products;
     }
 
+    // --- CÁC HÀM KHÁC GIỮ NGUYÊN ---
     public function get($id)
     {
         $product = Product::findWithCategory($id);
-        if (!$product) {
-            return null;
-        }
-        $product['variants'] = Product::getVariants($id);
-        $product['options'] = Product::getOptions($id);
+        if (!$product) return null;
+
         if (isset($product['images']) && is_string($product['images'])) {
             $product['images'] = json_decode($product['images'], true) ?: [];
         }
         if (isset($product['tags']) && is_string($product['tags'])) {
             $product['tags'] = json_decode($product['tags'], true) ?: [];
         }
-        foreach ($product['variants'] as &$variant) {
-            if (isset($variant['variant_values']) && is_string($variant['variant_values'])) {
-                $variant['variant_values'] = json_decode($variant['variant_values'], true) ?: [];
-            }
-        }
-        foreach ($product['options'] as &$option) {
-            if (isset($option['variant_combination']) && is_string($option['variant_combination'])) {
-                $option['variant_combination'] = json_decode($option['variant_combination'], true) ?: [];
-            }
-        }
+
+        $variants = ProductVariant::getByProductId($id);
+        $product['variants'] = array_map(function($variant) {
+            return ProductVariant::parseVariantValues($variant);
+        }, $variants);
+
+        $options = ProductOption::getByProductId($id);
+        $product['options'] = array_map(function($option) {
+            return ProductOption::parseVariantCombination($option);
+        }, $options);
+
         return $product;
     }
 

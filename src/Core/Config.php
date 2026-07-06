@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Core;
+namespace Rinnsan\RinnSanWeb\Core;
 
 class Config
 {

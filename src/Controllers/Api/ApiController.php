@@ -9,11 +9,11 @@ class ApiController
      */
     protected function json($data, $statusCode = 200)
     {
-        // Set CORS headers
-        \Rinnsan\RinnSanWeb\Helpers\ResponseHelper::cors();
+        // KHÔNG GỬI HEADERS Ở ĐÂY
+        // Headers đã được gửi trong index.php rồi
         
+        header('Content-Type: application/json; charset=UTF-8');
         http_response_code($statusCode);
-        header('Content-Type: application/json; charset=utf-8');
         echo json_encode($data, JSON_UNESCAPED_UNICODE);
         exit;
     }

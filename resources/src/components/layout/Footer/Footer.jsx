@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { 
   ArrowRight, ArrowUpRight, 
   Instagram, Facebook, Twitter, 
-  MapPin, Clock, Phone 
+  MapPin, Clock, Shield 
 } from 'lucide-react';
 
 const Footer = () => {
@@ -48,7 +48,7 @@ const Footer = () => {
           {/* 2. BOTTOM SECTION: GRID LINKS */}
           <div className="grid grid-cols-2 md:grid-cols-3">
              
-             {/* Cột 1: DANH MỤC SẢN PHẨM (Đã cập nhật đầy đủ) */}
+             {/* Cột 1: DANH MỤC SẢN PHẨM */}
              <div className="p-8 md:p-12 border-r border-b md:border-b-0 border-white/10">
                 <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-6">Danh mục sản phẩm</h4>
                 <ul className="space-y-3">
@@ -84,7 +84,7 @@ const Footer = () => {
                 </ul>
              </div>
 
-             {/* Cột 3: Socials */}
+             {/* Cột 3: Socials & Copyright */}
              <div className="p-8 md:p-12 flex flex-col justify-between">
                 <div>
                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-6">Mạng xã hội</h4>
@@ -96,29 +96,35 @@ const Footer = () => {
                       ))}
                    </div>
                 </div>
-                <div className="mt-8 md:mt-0">
+                <div className="mt-8 md:mt-0 space-y-4">
                    <p className="text-[10px] text-slate-600 uppercase tracking-wide">
                      © {currentYear} Rinn's Bakery.<br/>All rights reserved.
                    </p>
+                   
+                   {/* --- NÚT ADMIN Ở ĐÂY --- */}
+                   <Link 
+                     to="/admin/login" 
+                     className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-700 hover:text-amber-600 transition-colors group"
+                   >
+                     <Shield className="w-3 h-3 group-hover:text-amber-600 transition-colors" />
+                     <span>Dành cho nhân viên</span>
+                   </Link>
                 </div>
              </div>
           </div>
         </div>
 
 
-        {/* ================= CỘT PHẢI: ẢNH MỚI (40%) ================= */}
+        {/* ================= CỘT PHẢI: ẢNH (40%) ================= */}
         <div className="w-full lg:w-[40%] relative group bg-slate-900 overflow-hidden border-b lg:border-b-0 border-white/10 min-h-[400px] lg:min-h-auto">
           
-          {/* ẢNH MỚI: Không gian Quầy bánh & Cafe sang trọng (Tone ấm) */}
           <div 
              className="absolute inset-0 bg-cover bg-center opacity-80 group-hover:opacity-100 transition-opacity duration-700"
              style={{ backgroundImage: "url('https://images.unsplash.com/photo-1559339352-11d035aa65de?q=80&w=1600&auto=format&fit=crop')" }}
           ></div>
           
-          {/* Lớp phủ tối nhẹ bên dưới để chữ dễ đọc */}
           <div className="absolute inset-0 bg-gradient-to-t from-[#0b0c0f] via-black/10 to-transparent"></div>
 
-          {/* Nội dung nổi trên ảnh */}
           <div className="absolute bottom-0 left-0 w-full p-12">
              <div className="mb-8">
                <div className="inline-flex items-center gap-2 px-3 py-1 border border-white/20 backdrop-blur-md rounded-full text-white text-[10px] font-bold uppercase tracking-widest mb-4">
@@ -149,9 +155,9 @@ const Footer = () => {
                  </div>
                </li>
                <li className="flex items-center gap-4 pt-4">
-                  <a href="tel:1900636999" className="h-12 px-6 bg-white text-black hover:bg-amber-600 hover:text-white font-bold uppercase tracking-widest text-xs flex items-center gap-2 transition-all shadow-lg">
-                    Đặt bàn ngay
-                  </a>
+                  <Link to="/menu" className="h-12 px-6 bg-white text-black hover:bg-amber-600 hover:text-white font-bold uppercase tracking-widest text-xs flex items-center gap-2 transition-all shadow-lg">
+  ORDER ONLINE
+</Link>
                   <Link to="/locations" className="h-12 w-12 border border-white/50 bg-black/20 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white hover:text-black transition-all rounded-full">
                     <ArrowUpRight className="w-5 h-5" />
                   </Link>

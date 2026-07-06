@@ -65,5 +65,15 @@ class Category extends Model
         
         return Database::fetchAll($sql);
     }
-}
 
+    /**
+     * [MỚI] Gọi Stored Procedure lấy Full Menu
+     * SQL Server trả về JSON thông qua FOR JSON PATH
+     */
+    public static function getMenuFromProc()
+    {
+        // Gọi thủ tục GetFullMenu đã tạo trong SQL Server
+        $sql = "EXEC GetFullMenu";
+        return Database::fetchAll($sql);
+    }
+}

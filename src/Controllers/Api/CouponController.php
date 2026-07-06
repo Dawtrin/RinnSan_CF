@@ -3,7 +3,6 @@
 namespace Rinnsan\RinnSanWeb\Controllers\Api;
 
 use Rinnsan\RinnSanWeb\Models\Coupon;
-use Rinnsan\RinnSanWeb\Services\CouponService;
 
 class CouponController extends ApiController
 {
@@ -14,8 +13,7 @@ class CouponController extends ApiController
     public function index()
     {
         try {
-            $service = new CouponService();
-            $coupons = $service->list();
+            $coupons = Coupon::getAllActive();
             
             return $this->success($coupons, 'Lấy danh sách coupon thành công');
         } catch (\Exception $e) {
@@ -37,12 +35,18 @@ class CouponController extends ApiController
             }
             
             $orderAmount = $data['order_amount'] ?? 0;
-            $service = new CouponService();
-            $result = $service->validate($data['code'], $orderAmount);
-            if (!$result['valid']) {
-                return $this->error($result['message'], 400);
+            $validation = Coupon::validateCoupon($data['code'], $orderAmount);
+            
+            if (!$validation['valid']) {
+                return $this->error($validation['message'], 400);
             }
-            return $this->success($result, 'Coupon hợp lệ');
+            
+            $discount = Coupon::calculateDiscount($validation['coupon'], $orderAmount);
+            
+            return $this->success([
+                'coupon' => $validation['coupon'],
+                'discount_amount' => $discount
+            ], 'Coupon hợp lệ');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
         }
@@ -55,8 +59,7 @@ class CouponController extends ApiController
     public function show($id)
     {
         try {
-            $service = new CouponService();
-            $coupon = $service->get($id);
+            $coupon = Coupon::find($id);
             
             if (!$coupon) {
                 return $this->error('Coupon không tồn tại', 404);

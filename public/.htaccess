@@ -11,18 +11,7 @@
     RewriteRule ^(.*)$ index.php [QSA,L]
 </IfModule>
 
-# CORS Headers (for API)
-<IfModule mod_headers.c>
-    # Allow all origins (có thể restrict trong production)
-    Header set Access-Control-Allow-Origin "*"
-    Header set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-    Header set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, Accept, Origin"
-    Header set Access-Control-Allow-Credentials "true"
-    
-    # Handle preflight
-    RewriteCond %{REQUEST_METHOD} OPTIONS
-    RewriteRule ^(.*)$ $1 [R=200,L]
-</IfModule>
+
 
 # Cache static assets
 <IfModule mod_expires.c>

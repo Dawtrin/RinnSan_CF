@@ -3,6 +3,7 @@
 namespace Rinnsan\RinnSanWeb\Controllers\Api;
 
 use Rinnsan\RinnSanWeb\Services\UploadService;
+
 class UploadController extends ApiController
 {
     private $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
@@ -19,12 +20,18 @@ class UploadController extends ApiController
             if (!isset($_FILES['file'])) {
                 return $this->error('Không có file được upload', 400);
             }
+
             $service = new UploadService();
             $result = $service->upload($_FILES['file']);
+
             if (isset($result['error'])) {
                 return $this->error($result['error'], 400);
             }
-            return $this->success($result, 'Upload file thành công');
+
+            // Trả về kết quả thành công
+            return $this->success([
+                'data' => $result // Bọc trong 'data' nếu frontend cần, hoặc trả trực tiếp $result
+            ], 'Upload file thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
         }
@@ -58,36 +65,11 @@ class UploadController extends ApiController
             $service = new UploadService();
             $deleted = $service->delete($filename);
             if (!$deleted) {
-                return $this->error('File không tồn tại', 404);
+                return $this->error('File không tồn tại hoặc không thể xóa', 404);
             }
             return $this->success([], 'Xóa file thành công');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
         }
     }
-
-    /**
-     * Lấy thông báo lỗi upload
-     */
-    private function getUploadError($errorCode)
-    {
-        switch ($errorCode) {
-            case UPLOAD_ERR_INI_SIZE:
-            case UPLOAD_ERR_FORM_SIZE:
-                return 'File quá lớn';
-            case UPLOAD_ERR_PARTIAL:
-                return 'File chỉ upload một phần';
-            case UPLOAD_ERR_NO_FILE:
-                return 'Không có file được upload';
-            case UPLOAD_ERR_NO_TMP_DIR:
-                return 'Thiếu thư mục tạm';
-            case UPLOAD_ERR_CANT_WRITE:
-                return 'Không thể ghi file';
-            case UPLOAD_ERR_EXTENSION:
-                return 'Upload bị chặn bởi extension';
-            default:
-                return 'Lỗi không xác định';
-        }
-    }
 }
-
