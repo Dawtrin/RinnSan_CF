@@ -4,7 +4,8 @@ import {
   Trash2, Plus, Minus, ArrowLeft, ShoppingBag, 
   Loader2, ArrowRight, MessageSquare, PlusCircle, Star, Check
 } from 'lucide-react';
-import { apiUrl, assetUrl } from '../config/api.js';
+import { assetUrl } from '../config/api.js';
+import { apiFetch } from '../services/apiClient.js';
 
 const CartPage = () => {
   const [cartData, setCartData] = useState(null);
@@ -24,17 +25,10 @@ const CartPage = () => {
   // --- 2. GỌI API ---
   const fetchData = async () => {
     try {
-      const [cartRes, menuRes] = await Promise.all([
-        fetch(apiUrl('/api/cart'), {
-            method: 'GET',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }
-        }),
-        fetch(apiUrl('/api/menu'))
+      const [cartJson, menuJson] = await Promise.all([
+        apiFetch('/api/cart'),
+        apiFetch('/api/menu')
       ]);
-
-      const cartJson = await cartRes.json();
-      const menuJson = await menuRes.json();
 
       if (cartJson.success || cartJson.data) setCartData(cartJson.data || cartJson);
       
@@ -59,13 +53,11 @@ const CartPage = () => {
     if (newQty < 1) return;
     setUpdating(key);
     try {
-      const res = await fetch(apiUrl('/api/cart/update'), {
+      const json = await apiFetch('/api/cart/update', {
         method: 'PUT',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key, quantity: newQty })
       });
-      const json = await res.json();
       if (json.success || json.data) setCartData(json.data || json);
     } catch (err) { console.error(err); } 
     finally { setUpdating(null); }
@@ -74,13 +66,11 @@ const CartPage = () => {
   const handleRemoveItem = async (key) => {
     if (!window.confirm("Xóa món này khỏi giỏ?")) return;
     try {
-      const res = await fetch(apiUrl('/api/cart/remove'), {
+      const json = await apiFetch('/api/cart/remove', {
         method: 'DELETE',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key })
       });
-      const json = await res.json();
       if (json.success || json.data) setCartData(json.data || json);
     } catch (err) { console.error(err); }
   };
@@ -101,13 +91,12 @@ const CartPage = () => {
     const btn = document.getElementById(`btn-add-${product.ProductID}`);
     if(btn) btn.innerHTML = '<span class="animate-spin">↻</span>';
     try {
-        const res = await fetch(apiUrl('/api/cart/add'), {
+        const result = await apiFetch('/api/cart/add', {
             method: 'POST',
-            credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ product_id: product.ProductID, quantity: 1, options: {} })
         });
-        if(res.ok) fetchData(); 
+        if (result.success) fetchData(); 
     } catch(e) { console.error(e); }
   };
   const handleCheckout = () => {

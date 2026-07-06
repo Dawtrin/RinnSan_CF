@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ShoppingBag, Star, X, Plus, Minus, Filter } from 'lucide-react';
-import { apiUrl, assetUrl } from '../config/api.js';
+import { assetUrl } from '../config/api.js';
+import { apiFetch } from '../services/apiClient.js';
 
 const MenuPage = () => {
   const [activeCategory, setActiveCategory] = useState(null);
@@ -31,10 +32,7 @@ const MenuPage = () => {
   useEffect(() => {
     const fetchMenu = async () => {
       try {
-        const response = await fetch(apiUrl('/api/menu'));
-        if (!response.ok) throw new Error('Không thể tải thực đơn');
-        
-        const result = await response.json();
+        const result = await apiFetch('/api/menu');
         const realData = result.data ? result.data : result;
         setMenuData(Array.isArray(realData) ? realData : []);
 
@@ -71,8 +69,7 @@ const MenuPage = () => {
     setTotalPrice(Number(product.Price) || 0);
 
     try {
-      const res = await fetch(apiUrl(`/api/products/${product.ProductID}`));
-      const json = await res.json();
+      const json = await apiFetch(`/api/products/${product.ProductID}`);
 
       if (json.success || json.data) {
         const detail = json.data || json;
@@ -160,13 +157,9 @@ const MenuPage = () => {
     if (btnText) btnText.innerText = "Đang xử lý...";
 
     try {
-      const response = await fetch(apiUrl('/api/cart/add'), {
+      const result = await apiFetch('/api/cart/add', {
         method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify({
           product_id: selectedProduct.ProductID,
           quantity: quantity,
@@ -174,9 +167,7 @@ const MenuPage = () => {
         })
       });
 
-      const result = await response.json();
-
-      if (response.ok) {
+      if (result.success) {
         alert("Đã thêm món vào giỏ thành công! 😋");
         closeModal();
       } else {

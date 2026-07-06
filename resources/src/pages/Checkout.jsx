@@ -4,7 +4,7 @@ import {
   ArrowLeft, ArrowRight, MapPin, User, Phone, FileText, 
   Banknote, Loader2, ShieldCheck, QrCode, ShoppingBag, Ticket, X 
 } from 'lucide-react';
-import { apiUrl } from '../config/api.js';
+import { apiFetch } from '../services/apiClient.js';
 
 const Checkout = () => {
   const navigate = useNavigate();
@@ -28,11 +28,7 @@ const Checkout = () => {
   useEffect(() => {
     const fetchCart = async () => {
       try {
-        const res = await fetch(apiUrl('/api/cart'), {
-          credentials: 'include',
-          headers: { 'Accept': 'application/json' }
-        });
-        const json = await res.json();
+        const json = await apiFetch('/api/cart');
         
         if (json.data && json.data.items && json.data.items.length > 0) {
           setCartData(json.data);
@@ -57,7 +53,7 @@ const Checkout = () => {
     const subtotal = Number(cartData?.summary?.subtotal || 0);
 
     try {
-      const res = await fetch(apiUrl('/api/coupons/validate'), {
+      const data = await apiFetch('/api/coupons/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -65,7 +61,6 @@ const Checkout = () => {
             order_amount: subtotal 
         })
       });
-      const data = await res.json();
 
       if (data.success) {
         setAppliedCoupon({
@@ -122,23 +117,14 @@ const Checkout = () => {
     };
 
     try {
-      const res = await fetch(apiUrl('/api/orders'), {
+      const result = await apiFetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 
-      const result = await res.json();
-
-     if (res.ok && result.success) {
-        // [FIX 1] Đổi POST thành DELETE để khớp với Backend (sửa lỗi 404)
-        await fetch(apiUrl('/api/cart/clear'), { 
-            method: 'DELETE', 
-            credentials: 'include' 
-        }).catch(err => console.warn("Lỗi xóa giỏ:", err));
-        
-        // [FIX 2] Sửa lỗi NaN: Kiểm tra kỹ xem API có trả về tiền không
-        // Nếu không có (undefined), dùng ngay biến 'total' đã tính ở Frontend làm dự phòng
+     if (result.success) {
+        await apiFetch('/api/cart/clear', { method: 'DELETE' }).catch(err => console.warn("Lỗi xóa giỏ:", err));
         const finalTotal = (result.data && result.data.total_amount !== undefined)
             ? Number(result.data.total_amount) 
             : total; 

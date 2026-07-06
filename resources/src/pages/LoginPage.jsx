@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Lock, ArrowRight, Loader2, Coffee, Eye, EyeOff, ShieldCheck, Zap, Activity } from 'lucide-react';
-import { apiUrl, assetUrl } from '../config/api.js';
+import { assetUrl } from '../config/api.js';
+import { apiFetch } from '../services/apiClient.js';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -20,14 +21,13 @@ const LoginPage = () => {
     setLoading(true);
     
     try {
-      const res = await fetch(apiUrl('/api/auth/login'), {
+      const json = await apiFetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
-      const json = await res.json();
 
-      if (res.ok && json.success) {
+      if (json.success) {
         localStorage.setItem('token', json.data.token);
         localStorage.setItem('user', JSON.stringify(json.data.user));
         navigate('/admin/dashboard');

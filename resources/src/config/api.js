@@ -1,9 +1,12 @@
 /**
  * API base URL.
  * - Dev: set VITE_API_URL=http://localhost:8000 trong .env
- * - Production (Vercel): để trống → dùng same-origin (/api/...)
+ * - Production (Vercel FE-only): VITE_USE_MOCK=true
  */
 export const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+
+/** Bật mock data khi deploy FE không có backend */
+export const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
 
 export function apiUrl(path) {
   const normalized = path.startsWith('/') ? path : `/${path}`;

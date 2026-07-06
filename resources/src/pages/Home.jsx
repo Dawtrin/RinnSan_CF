@@ -5,7 +5,8 @@ import {
   ChevronRight, ShoppingBag, Heart, ChefHat, Wheat, 
   MapPin, Phone, Mail, Award, Droplets, Flame 
 } from 'lucide-react';
-import { apiUrl, assetUrl } from '../config/api.js';
+import { assetUrl } from '../config/api.js';
+import { apiFetch } from '../services/apiClient.js';
 
 const Home = () => {
   // --- STATE QUẢN LÝ DỮ LIỆU ---
@@ -17,8 +18,7 @@ const Home = () => {
     const fetchBestSellers = async () => {
       try {
         // Gọi API Public (Không cần token)
-        const res = await fetch(apiUrl('/api/products/best-sellers'));
-        const json = await res.json();
+        const json = await apiFetch('/api/products/best-sellers');
         
         if (json.success) {
           setBestSellers(json.data);
