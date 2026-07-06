@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Lock, ArrowRight, Loader2, Coffee, Eye, EyeOff, ShieldCheck, Zap, Activity } from 'lucide-react';
-import { assetUrl } from '../config/api.js';
+import { assetUrl, USE_MOCK } from '../config/api.js';
 import { apiFetch } from '../services/apiClient.js';
 
 const LoginPage = () => {
@@ -30,7 +30,7 @@ const LoginPage = () => {
       if (json.success) {
         localStorage.setItem('token', json.data.token);
         localStorage.setItem('user', JSON.stringify(json.data.user));
-        navigate('/admin/dashboard');
+        navigate(USE_MOCK ? '/' : '/admin/dashboard');
       } else {
         setError(json.message || 'Thông tin đăng nhập không chính xác');
       }

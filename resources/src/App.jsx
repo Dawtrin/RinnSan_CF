@@ -5,7 +5,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-
 import Header from './components/layout/Header/Header.jsx';
 import Footer from './components/layout/Footer/Footer.jsx';
 import ScrollToTop from './components/ScrollToTop.jsx';
-import AdminLayout from './components/AdminLayout.jsx'; // Đảm bảo đã tạo file này
 
 // Public Pages
 import Home from './pages/Home.jsx';
@@ -19,17 +18,7 @@ import CartPage from './pages/CartPage.jsx';
 import Checkout from './pages/Checkout.jsx';
 import OrderSuccessPage from './pages/OrderSuccessPage.jsx';
 import UIDemo from './pages/UIDemo.jsx';
-
-// Admin Pages
 import LoginPage from './pages/LoginPage.jsx';
-import Dashboard from './pages/Admin/Dashboard.jsx';
-import AdminUsers from './pages/Admin/AdminUsers.jsx';
-import AdminSuppliers from './pages/Admin/AdminSuppliers.jsx';
-import AdminProducts from './pages/Admin/AdminProducts.jsx';
-import AdminOrders from './pages/Admin/AdminOrders.jsx'; 
-import AdminCoupons from './pages/Admin/AdminCoupons.jsx';
-import AdminCustomers from './pages/Admin/AdminCustomers.jsx';
-import AdminStatistics from './pages/Admin/AdminStatistics.jsx';
 
 // Layout cho Khách (Có Header/Footer)
 const PublicLayout = () => {
@@ -65,22 +54,9 @@ export default function App() {
           <Route path="/ui" element={<UIDemo />} />
         </Route>
 
-        {/* --- TRANG LOGIN (Riêng biệt) --- */}
+        {/* --- TRANG LOGIN (demo UI) --- */}
         <Route path="/admin/login" element={<LoginPage />} />
-
-        {/* --- NHÓM ADMIN (Có Sidebar) --- */}
-        <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<Navigate to="/admin/dashboard" replace />} />
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="users" element={<AdminUsers />} />
-          <Route path="suppliers" element={<AdminSuppliers />} />
-          <Route path="products" element={<AdminProducts />} />
-          <Route path="orders" element={<AdminOrders />} />
-          <Route path="coupons" element={<AdminCoupons />} />
-          <Route path="customers" element={<AdminCustomers />} /> 
-          <Route path="statistics" element={<AdminStatistics />} />
-
-        </Route>
+        <Route path="/admin/*" element={<Navigate to="/admin/login" replace />} />
 
         {/* --- 404 --- */}
         <Route path="*" element={<Navigate to="/" replace />} />
